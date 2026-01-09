@@ -24,6 +24,8 @@ export async function POST(req: Request) {
         const cookieStore = await cookies();
         cookieStore.set('token', token, { httpOnly: true, path: '/' }); // Secure HTTP Only
         cookieStore.set('role', user.role, { path: '/' }); // Readable for UI changes
+        // Use encodeURIComponent to handle special characters (Thai) in cookies safely
+        cookieStore.set('name', encodeURIComponent(user.name), { path: '/' });
 
         return NextResponse.json({ success: true, user: { name: user.name, role: user.role } });
     } catch (err) {

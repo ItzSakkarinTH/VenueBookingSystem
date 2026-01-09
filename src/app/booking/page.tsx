@@ -175,7 +175,7 @@ export default function BookingPage() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    zIndex: 1000,
+                    zIndex: 2000,
                     backdropFilter: 'blur(5px)'
                 }}>
                     <div className="glass-panel" style={{
