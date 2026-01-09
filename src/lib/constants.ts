@@ -6,7 +6,7 @@ export const ZONES = [
 
 // Mock Layout: 3x3 blocks for each zone
 export const GENERATE_LOCKS = (day: 'Saturday' | 'Sunday') => {
-    const locks = [];
+    const locks: { id: string; label: string; zone: string; price: number }[] = [];
 
     // Saturday: Only A and B
     // Sunday: All Zones
