@@ -8,6 +8,7 @@ export default function RegisterPage() {
     const router = useRouter();
     const [formData, setFormData] = useState({
         name: '',
+        email: '',
         phone: '',
         password: '',
         confirmPassword: '',
@@ -33,6 +34,7 @@ export default function RegisterPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: formData.name,
+                    email: formData.email,
                     phone: formData.phone,
                     password: formData.password,
                     idCard: formData.idCard
@@ -43,8 +45,12 @@ export default function RegisterPage() {
             if (!res.ok) throw new Error(data.error || 'Registration failed');
 
             window.location.href = '/booking';
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError('Registration failed');
+            }
             setLoading(false);
         }
     };
@@ -61,6 +67,15 @@ export default function RegisterPage() {
                             type="text" required
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}
+                        />
+                    </div>
+                    <div>
+                        <label>อีเมล (สำหรับเข้าสู่ระบบ)</label>
+                        <input
+                            type="email" required
+                            value={formData.email}
+                            onChange={e => setFormData({ ...formData, email: e.target.value })}
                             style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}
                         />
                     </div>

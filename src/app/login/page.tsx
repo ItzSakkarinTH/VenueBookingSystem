@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 export default function LoginPage() {
     const router = useRouter();
-    const [formData, setFormData] = useState({ phone: '', password: '' });
+    const [formData, setFormData] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -27,8 +27,12 @@ export default function LoginPage() {
 
             // Force full reload to update Navbar state (cookies)
             window.location.href = '/booking';
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError('Login failed');
+            }
             setLoading(false);
         }
     };
@@ -40,13 +44,13 @@ export default function LoginPage() {
 
                 <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div>
-                        <label>เบอร์โทรศัพท์</label>
+                        <label>อีเมล</label>
                         <input
-                            type="tel"
+                            type="email"
                             required
                             className="form-input"
-                            value={formData.phone}
-                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                            value={formData.email}
+                            onChange={e => setFormData({ ...formData, email: e.target.value })}
                             style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}
                         />
                     </div>

@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { User } from '@/types';
 
 export default function ProfilePage() {
     const router = useRouter();
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
-    const [editForm, setEditForm] = useState({ name: '', phone: '', password: '' });
+    const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', password: '' });
 
     useEffect(() => {
         fetch('/api/user/profile')
@@ -18,7 +19,7 @@ export default function ProfilePage() {
             })
             .then(data => {
                 setUser(data.user);
-                setEditForm({ name: data.user.name, phone: data.user.phone, password: '' });
+                setEditForm({ name: data.user.name, email: data.user.email, phone: data.user.phone, password: '' });
                 setLoading(false);
             })
             .catch(() => {
@@ -36,13 +37,14 @@ export default function ProfilePage() {
         if (res.ok) {
             alert('Updated successfully');
             setIsEditing(false);
-            setUser({ ...user, ...editForm });
+            setUser(prev => prev ? { ...prev, ...editForm } : null);
         } else {
             alert('Update failed');
         }
     };
 
     if (loading) return <div className="container" style={{ padding: '2rem' }}>Loading...</div>;
+    if (!user) return null;
 
     return (
         <div className="container" style={{ marginTop: '2rem', maxWidth: '600px' }}>
@@ -63,6 +65,14 @@ export default function ProfilePage() {
                             <input
                                 value={editForm.name}
                                 onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e0' }}
+                            />
+                        </div>
+                        <div>
+                            <label>อีเมล</label>
+                            <input
+                                value={editForm.email}
+                                onChange={e => setEditForm({ ...editForm, email: e.target.value })}
                                 style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e0' }}
                             />
                         </div>
@@ -94,6 +104,10 @@ export default function ProfilePage() {
                         <div>
                             <label style={{ color: 'var(--text-muted)' }}>ชื่อ - นามสกุล</label>
                             <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{user.name}</div>
+                        </div>
+                        <div>
+                            <label style={{ color: 'var(--text-muted)' }}>อีเมล</label>
+                            <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>{user.email}</div>
                         </div>
                         <div>
                             <label style={{ color: 'var(--text-muted)' }}>เบอร์โทรศัพท์</label>

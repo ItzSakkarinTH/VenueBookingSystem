@@ -8,17 +8,18 @@ import { cookies } from 'next/headers';
 export async function POST(req: Request) {
     await dbConnect();
     try {
-        const { name, phone, password, idCard } = await req.json();
+        const { name, email, phone, password, idCard } = await req.json();
 
         // Check if user exists
-        const existingUser = await User.findOne({ $or: [{ phone }, { idCard }] });
+        const existingUser = await User.findOne({ $or: [{ email }, { phone }, { idCard }] });
         if (existingUser) {
-            return NextResponse.json({ error: 'User with this phone or ID card already exists' }, { status: 400 });
+            return NextResponse.json({ error: 'User with this email, phone, or ID card already exists' }, { status: 400 });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await User.create({
             name,
+            email,
             phone,
             idCard,
             password: hashedPassword,

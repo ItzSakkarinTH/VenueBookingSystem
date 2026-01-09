@@ -8,9 +8,9 @@ import { cookies } from 'next/headers';
 export async function POST(req: Request) {
     await dbConnect();
     try {
-        const { phone, password } = await req.json();
+        const { email, password } = await req.json();
 
-        const user = await User.findOne({ phone });
+        const user = await User.findOne({ email });
         if (!user) {
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
         }
