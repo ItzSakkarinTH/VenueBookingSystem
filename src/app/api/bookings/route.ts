@@ -18,34 +18,52 @@ export async function POST(req: Request) {
     await dbConnect();
     const user = await getUserFromCookie();
 
-    if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     try {
         const body = await req.json();
-        const { lockId, date, amount, slipImage, paymentDetails } = body;
+        const { lockId, date, amount, slipImage, paymentDetails, guestName, guestPhone, guestIdCard } = body;
 
-        // Create Booking
-        // The Unique Index on (lockId, date) will prevent duplicates/race conditions
-        const booking = await Booking.create({
-            userId: user.userId,
+        // Validation for guest
+        if (!user && (!guestName || !guestPhone)) {
+            return NextResponse.json({ error: 'Guest name and phone are required' }, { status: 400 });
+        }
+
+        const bookingData: {
+            lockId: string;
+            date: string;
+            amount: number;
+            slipImage: string;
+            paymentDetails: Record<string, unknown>;
+            status: string;
+            userId?: string;
+            guestName?: string;
+            guestPhone?: string;
+            guestIdCard?: string;
+        } = {
             lockId,
             date,
             amount,
             slipImage,
             paymentDetails,
-            status: 'pending' // Admin needs to approve? User said "Who transfers first... Approve first". 
-            // If we want auto-approve based on first-come, we can set it to 'approved' but usually slip needs verification.
-            // However, the constraint is "First Book gets the lock". 
-            // So creation IS the reservation.
-        });
+            status: 'pending'
+        };
+
+        if (user) {
+            bookingData.userId = user.userId;
+        } else {
+            bookingData.guestName = guestName;
+            bookingData.guestPhone = guestPhone;
+            bookingData.guestIdCard = guestIdCard;
+        }
+
+        // Create Booking
+        // The Unique Index on (lockId, date) will prevent duplicates/race conditions
+        const booking = await Booking.create(bookingData);
 
         return NextResponse.json({ success: true, booking });
-    } catch (err: any) {
-        if (err.code === 11000) {
+    } catch (err: unknown) {
+        if ((err as { code?: number }).code === 11000) {
             return NextResponse.json({ error: 'This lock is already booked by someone else.' }, { status: 409 });
         }
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ error: (err as Error).message || 'An error occurred' }, { status: 500 });
     }
 }
