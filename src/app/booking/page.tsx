@@ -186,7 +186,7 @@ export default function BookingPage() {
                             }}>
                                 {s.id}
                             </div>
-                            <span style={{ fontWeight: 500, color: 'var(--text-main)', fontSize: '0.9rem' }} className="hidden-mobile">
+                            <span className="hidden-mobile" style={{ fontWeight: 500, color: 'var(--text-main)', fontSize: '0.9rem' }}>
                                 {s.label}
                             </span>
                             {idx < 2 && <div style={{ width: 40, height: 2, background: '#e2e8f0', margin: '0 0.5rem' }} />}
@@ -218,7 +218,7 @@ export default function BookingPage() {
                         <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <Calendar size={20} color="var(--primary-orange)" /> เลือกวันที่ต้องการจอง
                         </h2>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.75rem' }}>
                             {dates.map((d) => (
                                 <button
                                     key={d.date}
