@@ -11,7 +11,17 @@ export async function POST(req: Request) {
         const { name, email, phone, password, idCard } = await req.json();
 
         // Check if user exists
-        const existingUser = await User.findOne({ $or: [{ email }, { phone }, { idCard }] });
+        // Escape special characters for regex
+        const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // Check if user exists (case-insensitive for email)
+        const existingUser = await User.findOne({
+            $or: [
+                { email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') } },
+                { phone },
+                { idCard }
+            ]
+        });
         if (existingUser) {
             return NextResponse.json({ error: 'User with this email, phone, or ID card already exists' }, { status: 400 });
         }
@@ -19,7 +29,7 @@ export async function POST(req: Request) {
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await User.create({
             name,
-            email,
+            email: email.toLowerCase(),
             phone,
             idCard,
             password: hashedPassword,
