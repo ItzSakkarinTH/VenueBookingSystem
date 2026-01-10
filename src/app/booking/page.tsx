@@ -66,6 +66,7 @@ export default function BookingPage() {
     // User Info
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [guestInfo, setGuestInfo] = useState({ name: '', phone: '', idCard: '' });
+    const [productType, setProductType] = useState('general'); // Default
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -132,7 +133,8 @@ export default function BookingPage() {
                 date: selectedDateInfo.date,
                 amount: selectedLock.price,
                 slipImage: slipData.slipImage,
-                paymentDetails: { ...slipData.qrData, ...slipData.ocrData }
+                paymentDetails: { ...slipData.qrData, ...slipData.ocrData },
+                productType: productType
             };
 
             if (!isLoggedIn) {
@@ -386,6 +388,25 @@ export default function BookingPage() {
                                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>ข้อมูลของคุณจะถูกบันทึกอัตโนมัติ</p>
                                     </div>
                                 )}
+
+
+
+                                <div style={{ marginBottom: '2rem' }}>
+                                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>ประเภทสินค้าที่ขาย *</h3>
+                                    <select
+                                        className="input-field"
+                                        value={productType}
+                                        onChange={(e) => setProductType(e.target.value)}
+                                        style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}
+                                    >
+                                        <option value="general">สินค้าทั่วไป (เช่น เสื้อผ้า, ของใช้)</option>
+                                        <option value="food">อาหาร / เครื่องดื่ม</option>
+                                        <option value="other">อื่นๆ</option>
+                                    </select>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                                        * โปรดเลือกประเภทสินค้าให้ตรงกับล็อกที่จอง (ล็อก 40-80 สำหรับอาหาร)
+                                    </p>
+                                </div>
 
                                 <div style={{ marginBottom: '1rem' }}>
                                     <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>ชำระเงิน</h3>

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        const { lockId, date, amount, slipImage, paymentDetails, guestName, guestPhone, guestIdCard } = body;
+        const { lockId, date, amount, slipImage, paymentDetails, guestName, guestPhone, guestIdCard, productType } = body;
 
         // Validation for guest
         if (!user && (!guestName || !guestPhone)) {
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
             amount: number;
             slipImage: string;
             paymentDetails: Record<string, unknown>;
+            productType?: string;
             status: string;
             userId?: string;
             guestName?: string;
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
             amount,
             slipImage,
             paymentDetails,
+            productType,
             status: 'pending'
         };
 

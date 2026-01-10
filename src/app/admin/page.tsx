@@ -11,6 +11,7 @@ interface Booking {
     status: 'pending' | 'approved' | 'rejected';
     slipImage?: string;
     amount: number;
+    productType?: string;
 }
 
 export default function AdminDashboard() {
@@ -122,6 +123,7 @@ export default function AdminDashboard() {
                             <tr style={{ background: '#f7fafc', textAlign: 'left' }}>
                                 <th style={{ padding: '1rem' }}>User</th>
                                 <th style={{ padding: '1rem' }}>Lock</th>
+                                <th style={{ padding: '1rem' }}>Product</th>
                                 <th style={{ padding: '1rem' }}>Date</th>
                                 <th style={{ padding: '1rem' }}>Status</th>
                                 <th style={{ padding: '1rem' }}>Slip</th>
@@ -133,6 +135,7 @@ export default function AdminDashboard() {
                                 <tr key={booking._id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                                     <td style={{ padding: '1rem' }}>{booking.userId?.name}</td>
                                     <td style={{ padding: '1rem' }}>{booking.lockId}</td>
+                                    <td style={{ padding: '1rem' }}>{booking.productType || '-'}</td>
                                     <td style={{ padding: '1rem' }}>{booking.date}</td>
                                     <td style={{ padding: '1rem' }}>
                                         <span style={{
