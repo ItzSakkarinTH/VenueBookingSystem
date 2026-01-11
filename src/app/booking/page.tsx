@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+
 import { GENERATE_LOCKS, ZONES } from '@/lib/constants';
 import SlipReaderIntegrated from '../components/SlipReader';
 import { SlipData } from '@/types';
@@ -19,12 +19,24 @@ const getUpcomingDates = () => {
         d.setDate(today.getDate() + i);
         const day = d.getDay();
 
+        const fullDate = d.toLocaleDateString('th-TH', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+        const shortDate = d.toLocaleDateString('th-TH', {
+            day: 'numeric',
+            month: 'short'
+        });
+
         if (day === 6) { // Saturday
             dates.push({
                 dateObj: d,
                 date: d.toISOString().split('T')[0],
-                label: d.toLocaleDateString('th-TH', { day: 'numeric', month: 'long' }),
+                label: fullDate,
+                shortLabel: shortDate,
                 dayName: 'วันเสาร์',
+                dayNum: d.getDate(),
                 key: 'Saturday' as const
             });
         }
@@ -32,8 +44,10 @@ const getUpcomingDates = () => {
             dates.push({
                 dateObj: d,
                 date: d.toISOString().split('T')[0],
-                label: d.toLocaleDateString('th-TH', { day: 'numeric', month: 'long' }),
+                label: fullDate,
+                shortLabel: shortDate,
                 dayName: 'วันอาทิตย์',
+                dayNum: d.getDate(),
                 key: 'Sunday' as const
             });
         }
@@ -42,7 +56,6 @@ const getUpcomingDates = () => {
 };
 
 export default function BookingPage() {
-    const router = useRouter();
 
     // Steps: 1=Date, 2=Lock, 3=Info/Payment
     const [step, setStep] = useState(1);
@@ -70,6 +83,10 @@ export default function BookingPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // Booking Confirmation
+    const [bookingConfirmed, setBookingConfirmed] = useState(false);
+    const [bookingId, setBookingId] = useState<string>('');
+
     // Init
     // Init
     useEffect(() => {
@@ -78,16 +95,8 @@ export default function BookingPage() {
         setIsLoggedIn(!!token);
     }, []);
 
-    // Zoom Map Logic
-    // Zoom Map Logic
+    // Zone Selection
     const [activeZone, setActiveZone] = useState<string | null>(null);
-    const ZONE_COORDS: Record<string, { scale: number; x: string; y: string }> = {
-        'A': { scale: 3.5, x: '12%', y: '50%' },
-        'B': { scale: 3.5, x: '27%', y: '50%' },
-        'C': { scale: 3.5, x: '42%', y: '50%' },
-        'D': { scale: 3.5, x: '57%', y: '50%' },
-        'E': { scale: 3.5, x: '73%', y: '50%' },
-    };
 
     // Fetch Bookings when date changes
     useEffect(() => {
@@ -164,8 +173,10 @@ export default function BookingPage() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Booking failed');
 
-            alert('จองสำเร็จ! กรุณารอการอนุมัติ');
-            router.push('/profile'); // Redirect to profile or history
+            // Show receipt instead of redirect
+            setBookingId(data.booking?._id || data.bookingId || 'BK' + Date.now());
+            setBookingConfirmed(true);
+            setStep(4); // Step 4 = Receipt
 
         } catch (err: unknown) {
             setError((err as Error).message || 'An error occurred');
@@ -737,6 +748,188 @@ export default function BookingPage() {
                                         onSlipVerified={handleSlipVerified}
                                         onError={(msg) => setError(msg)}
                                     />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 4: Receipt / Confirmation */}
+                {step === 4 && bookingConfirmed && selectedLock && selectedDateInfo && (
+                    <div style={{ textAlign: 'center' }}>
+                        {/* Success Animation */}
+                        <div style={{
+                            width: '80px',
+                            height: '80px',
+                            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 1.5rem auto'
+                        }}>
+                            <CheckCircle size={40} color="white" />
+                        </div>
+
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#166534', marginBottom: '0.5rem' }}>
+                            จองสำเร็จ!
+                        </h2>
+                        <p style={{ color: '#64748b', marginBottom: '2rem' }}>
+                            กรุณารอการตรวจสอบและอนุมัติจากแอดมิน
+                        </p>
+
+                        {/* Receipt Card */}
+                        <div id="receipt-card" style={{
+                            background: 'white',
+                            borderRadius: '16px',
+                            overflow: 'hidden',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                            maxWidth: '400px',
+                            margin: '0 auto',
+                            textAlign: 'left'
+                        }}>
+                            {/* Receipt Header */}
+                            <div style={{
+                                background: 'linear-gradient(135deg, #ff8c42 0%, #e84a0e 100%)',
+                                padding: '1.5rem',
+                                color: 'white',
+                                textAlign: 'center'
+                            }}>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                                    ใบยืนยันการจอง
+                                </div>
+                                <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>
+                                    ตลาดนัดคนเดินศรีสะเกษ
+                                </div>
+                            </div>
+
+                            {/* Receipt Body */}
+                            <div style={{ padding: '1.5rem' }}>
+                                {/* Booking ID */}
+                                <div style={{
+                                    background: '#f8fafc',
+                                    padding: '1rem',
+                                    borderRadius: '10px',
+                                    marginBottom: '1rem',
+                                    textAlign: 'center'
+                                }}>
+                                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>หมายเลขการจอง</div>
+                                    <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#1e293b', letterSpacing: '1px' }}>
+                                        {bookingId}
+                                    </div>
+                                </div>
+
+                                {/* Details */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px dashed #e2e8f0' }}>
+                                        <span style={{ color: '#64748b' }}>วันที่ขาย</span>
+                                        <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                                            {selectedDateInfo.dayName}ที่ {selectedDateInfo.label}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px dashed #e2e8f0' }}>
+                                        <span style={{ color: '#64748b' }}>ล็อก</span>
+                                        <span style={{ fontWeight: '700', color: '#e84a0e', fontSize: '1.1rem' }}>
+                                            {selectedLock.id}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px dashed #e2e8f0' }}>
+                                        <span style={{ color: '#64748b' }}>โซน</span>
+                                        <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                                            {ZONES.find(z => z.id === selectedLock.zone)?.name || selectedLock.zone}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px dashed #e2e8f0' }}>
+                                        <span style={{ color: '#64748b' }}>ผู้จอง</span>
+                                        <span style={{ fontWeight: '500', color: '#1e293b' }}>
+                                            {isLoggedIn ? 'สมาชิก' : guestInfo.name}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px dashed #e2e8f0' }}>
+                                        <span style={{ color: '#64748b' }}>ประเภทสินค้า</span>
+                                        <span style={{ fontWeight: '500', color: '#1e293b' }}>
+                                            {productType === 'food' ? 'อาหาร/เครื่องดื่ม' : productType === 'general' ? 'สินค้าทั่วไป' : 'อื่นๆ'}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem' }}>
+                                        <span style={{ fontWeight: '600', color: '#1e293b' }}>ยอดชำระ</span>
+                                        <span style={{ fontWeight: 'bold', color: '#e84a0e', fontSize: '1.25rem' }}>
+                                            {selectedLock.price} บาท
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Status */}
+                                <div style={{
+                                    marginTop: '1.5rem',
+                                    padding: '0.75rem',
+                                    background: '#fef3c7',
+                                    borderRadius: '10px',
+                                    textAlign: 'center'
+                                }}>
+                                    <span style={{ color: '#92400e', fontWeight: '500', fontSize: '0.9rem' }}>
+                                        ⏳ สถานะ: รอตรวจสอบสลิป
+                                    </span>
+                                </div>
+
+                                {/* Timestamp */}
+                                <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.75rem', color: '#94a3b8' }}>
+                                    จองเมื่อ: {new Date().toLocaleString('th-TH')}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                            <button
+                                onClick={() => window.print()}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    padding: '0.75rem 1.5rem',
+                                    background: 'white',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '10px',
+                                    cursor: 'pointer',
+                                    fontWeight: '500',
+                                    color: '#475569'
+                                }}
+                            >
+                                🖨️ พิมพ์ใบยืนยัน
+                            </button>
+                            <Link
+                                href="/"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    padding: '0.75rem 1.5rem',
+                                    background: 'linear-gradient(135deg, #ff8c42 0%, #e84a0e 100%)',
+                                    color: 'white',
+                                    borderRadius: '10px',
+                                    textDecoration: 'none',
+                                    fontWeight: '600'
+                                }}
+                            >
+                                กลับหน้าหลัก
+                            </Link>
+                        </div>
+
+                        {/* Info Note */}
+                        <div style={{
+                            marginTop: '2rem',
+                            padding: '1rem',
+                            background: '#f0f9ff',
+                            borderRadius: '10px',
+                            maxWidth: '400px',
+                            margin: '2rem auto 0 auto'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                                <Info size={20} color="#0369a1" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                <div style={{ fontSize: '0.85rem', color: '#0369a1', textAlign: 'left' }}>
+                                    <strong>หมายเหตุ:</strong> แอดมินจะตรวจสอบสลิปและอนุมัติภายใน 24 ชั่วโมง
+                                    หากมีปัญหาสามารถติดต่อได้ที่ Line: @venuebooking
                                 </div>
                             </div>
                         </div>
