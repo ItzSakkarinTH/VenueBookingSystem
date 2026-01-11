@@ -1,33 +1,38 @@
 export const ZONES = [
-    { id: 'A', name: 'Zone A (โซนโชติพันธ์ 1)', price: 500, rows: 2, cols: 5, color: '#ef4444' }, // Red
-    { id: 'B', name: 'Zone B (โซนคนเดิน)', price: 400, rows: 2, cols: 5, color: '#eab308' }, // Yellow
-    { id: 'C', name: 'Zone C (โซนจุ่มแซบ)', price: 300, rows: 2, cols: 5, color: '#22c55e' }, // Green
-    { id: 'D', name: 'Zone D (โซนหนองแคน)', price: 300, rows: 2, cols: 5, color: '#3b82f6' }, // Blue
-    { id: 'E', name: 'Zone E (โซนวิจิตร)', price: 200, rows: 2, cols: 5, color: '#f97316' }, // Orange
+    { id: 'A', name: 'Zone A (โซนโชติพันธ์ 1)', price: 43, rows: 3, cols: 9, color: '#ef4444' }, // Red
+    { id: 'B', name: 'Zone B (โซนคนเดิน)', price: 43, rows: 3, cols: 9, color: '#f97316' }, // Orange
+    { id: 'C', name: 'Zone C (โซนจุ่มแซบ)', price: 43, rows: 3, cols: 9, color: '#eab308' }, // Yellow
+    { id: 'D', name: 'Zone D (โซนหนองแคน)', price: 43, rows: 3, cols: 9, color: '#22c55e' }, // Green
+    { id: 'E', name: 'Zone E (โซนวิจิตร)', price: 43, rows: 3, cols: 9, color: '#3b82f6' }, // Blue
 ];
 
-// Mock Layout: Generate locks based on configuration
+// Generate locks based on configuration
 export const GENERATE_LOCKS = (day: 'Saturday' | 'Sunday') => {
     const locks: { id: string; label: string; zone: string; price: number }[] = [];
 
-    // For simplicity, all zones active every day for now, or customize as needed
-    // The user previously had logic: Saturday A&B only. 
-    // I will keep all zones active for now as the user asked for this specific layout.
-    const activeZones = ZONES;
+    // Saturday: Open only 3 zones (A, B, C)
+    // Sunday: Open all zones (A, B, C, D, E)
+    let activeZones = ZONES;
+    if (day === 'Saturday') {
+        activeZones = ZONES.slice(0, 3); // Zones A, B, C
+    }
 
     activeZones.forEach(zone => {
-        for (let r = 1; r <= zone.rows; r++) {
-            for (let c = 1; c <= zone.cols; c++) {
-                // Pad numbers for sorting, e.g. A01, A02
-                const num = ((r - 1) * zone.cols) + c;
-                const paddedNum = num < 10 ? `0${num}` : `${num}`;
-                locks.push({
-                    id: `${zone.id}${paddedNum}`,
-                    label: `${zone.id}${paddedNum}`,
-                    zone: zone.id,
-                    price: zone.price,
-                });
-            }
+        // Create 27 locks (3 rows * 9 cols) per zone
+        // Modeled as a simple list for now
+        // If we want to strictly mimic 3 groups of 3x3, we might need more complex UI logic,
+        // but for data generation, a flat list A01-A27 is standard.
+        const totalLocks = zone.rows * zone.cols; // 27
+
+        for (let i = 1; i <= totalLocks; i++) {
+            // Zero pad: A01, A02 ... A27
+            const paddedNum = i < 10 ? `0${i}` : `${i}`;
+            locks.push({
+                id: `${zone.id}${paddedNum}`,
+                label: `${zone.id}${paddedNum}`,
+                zone: zone.id,
+                price: zone.price,
+            });
         }
     });
     return locks;

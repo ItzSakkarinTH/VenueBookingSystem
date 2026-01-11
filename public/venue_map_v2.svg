@@ -46,7 +46,7 @@
   <circle cx="450" cy="270" r="15" fill="#f87171" stroke="white" stroke-width="2"/>
   <text x="470" y="275" class="label" font-size="12">จุดนัดพบ</text>
 
-  <!-- ZONES OVERLAY (Based on user image 1) -->
+  <!-- ZONES OVERLAY -->
   <!-- Zone A: Red -->
   <g transform="rotate(3, 500, 300)">
       <rect x="50" y="285" width="140" height="40" fill="#ef4444" opacity="0.8" rx="4" stroke="white" stroke-width="2"/>
@@ -76,5 +76,4 @@
       <rect x="650" y="285" width="150" height="40" fill="#3b82f6" opacity="0.8" rx="4" stroke="white" stroke-width="2"/>
       <text x="725" y="310" class="zone-label">E</text>
   </g>
-
 </svg>

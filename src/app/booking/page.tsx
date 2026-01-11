@@ -82,11 +82,11 @@ export default function BookingPage() {
     // Zoom Map Logic
     const [activeZone, setActiveZone] = useState<string | null>(null);
     const ZONE_COORDS: Record<string, { scale: number; x: string; y: string }> = {
-        'A': { scale: 3, x: '10%', y: '45%' },
-        'B': { scale: 3, x: '30%', y: '45%' },
-        'C': { scale: 3, x: '50%', y: '45%' },
-        'D': { scale: 3, x: '70%', y: '45%' },
-        'E': { scale: 3, x: '90%', y: '45%' },
+        'A': { scale: 3.5, x: '12%', y: '50%' },
+        'B': { scale: 3.5, x: '27%', y: '50%' },
+        'C': { scale: 3.5, x: '42%', y: '50%' },
+        'D': { scale: 3.5, x: '57%', y: '50%' },
+        'E': { scale: 3.5, x: '73%', y: '50%' },
     };
 
     // Fetch Bookings when date changes
@@ -251,7 +251,7 @@ export default function BookingPage() {
                                     <div style={{ fontWeight: 'bold', color: 'var(--primary-orange)', marginBottom: '0.25rem' }}>{d.dayName}</div>
                                     <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{d.label}</div>
                                     <div style={{ fontSize: '0.8rem', color: '#718096', marginTop: '0.5rem' }}>
-                                        {d.key === 'Saturday' ? 'โซน A, B' : 'ทุกโซน'}
+                                        {d.key === 'Saturday' ? 'โซน A-C' : 'ทุกโซน'}
                                     </div>
                                 </button>
                             ))}
@@ -274,7 +274,7 @@ export default function BookingPage() {
                         {/* Zone Selection & Map Map */}
                         <div style={{ marginBottom: '2rem' }}>
                             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                                {ZONES.map(z => (
+                                {ZONES.filter(z => selectedDateInfo?.key === 'Sunday' || ['A', 'B', 'C'].includes(z.id)).map(z => (
                                     <button
                                         key={z.id}
                                         onClick={() => setActiveZone(activeZone === z.id ? null : z.id)}
@@ -309,37 +309,103 @@ export default function BookingPage() {
                                 </button>
                             </div>
 
-                            {/* Map Container */}
+                            {/* Map Container - Visual Zone Layout */}
                             <div style={{
                                 width: '100%',
-                                height: '300px',
+                                height: '200px',
                                 borderRadius: 'var(--radius-lg)',
                                 overflow: 'hidden',
                                 position: 'relative',
                                 border: '1px solid #e2e8f0',
                                 marginBottom: '1rem',
-                                background: '#f0f4f8'
+                                background: 'linear-gradient(135deg, #e8f5e9 0%, #f5f5f5 50%, #e3f2fd 100%)'
                             }}>
-                                <div
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        backgroundImage: 'url("/venue_map.svg")',
-                                        backgroundSize: 'cover',
-                                        backgroundPosition: 'center',
-                                        transition: 'transform 0.5s ease-in-out, transform-origin 0.5s ease-in-out',
-                                        transform: activeZone ? `scale(${ZONE_COORDS[activeZone]?.scale || 1})` : 'scale(1)',
-                                        transformOrigin: activeZone ? `${ZONE_COORDS[activeZone]?.x} ${ZONE_COORDS[activeZone]?.y}` : 'center center',
-                                        cursor: 'pointer'
-                                    }}
-                                    onClick={() => setActiveZone(null)} // Click map to zoom out
-                                >
-                                    {/* Optional: Add markers on map if needed */}
-                                    {!activeZone && (
-                                        <div style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem' }}>
-                                            แตะเพื่อเลือกโซน
+                                {/* Road */}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '40%',
+                                    left: '-5%',
+                                    width: '110%',
+                                    height: '60px',
+                                    background: 'white',
+                                    transform: 'rotate(-5deg)',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-around',
+                                    padding: '5px 40px'
+                                }}>
+                                    {/* Zone Blocks */}
+                                    {ZONES.filter(z => selectedDateInfo?.key === 'Sunday' || ['A', 'B', 'C'].includes(z.id)).map(z => (
+                                        <div
+                                            key={z.id}
+                                            onClick={() => setActiveZone(activeZone === z.id ? null : z.id)}
+                                            style={{
+                                                width: '80px',
+                                                height: '40px',
+                                                background: z.color,
+                                                borderRadius: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: 'white',
+                                                fontWeight: 'bold',
+                                                fontSize: '1.2rem',
+                                                cursor: 'pointer',
+                                                boxShadow: activeZone === z.id ? '0 0 0 3px white, 0 0 0 5px ' + z.color : 'none',
+                                                transform: activeZone === z.id ? 'scale(1.1)' : 'scale(1)',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {z.id}
                                         </div>
-                                    )}
+                                    ))}
+                                </div>
+                                {/* Pond indicator */}
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '10px',
+                                    right: '20px',
+                                    width: '80px',
+                                    height: '50px',
+                                    background: '#7dd3fc',
+                                    borderRadius: '50%',
+                                    opacity: 0.7
+                                }} />
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '15px',
+                                    right: '50px',
+                                    width: '60px',
+                                    height: '35px',
+                                    background: '#7dd3fc',
+                                    borderRadius: '40%',
+                                    opacity: 0.6
+                                }} />
+                                {/* Stadium indicator */}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '20px',
+                                    left: '20px',
+                                    width: '70px',
+                                    height: '45px',
+                                    border: '3px solid #86efac',
+                                    borderRadius: '50%',
+                                    background: '#dcfce7'
+                                }} />
+                                {/* Label */}
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '8px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    fontSize: '0.75rem',
+                                    color: '#64748b',
+                                    background: 'rgba(255,255,255,0.8)',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px'
+                                }}>
+                                    ถ.โชติพันธ์ • แตะโซนเพื่อเลือก
                                 </div>
                             </div>
                         </div>

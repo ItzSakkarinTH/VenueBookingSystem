@@ -5,7 +5,13 @@ import Link from 'next/link';
 
 export default function HomePage() {
   const [showAnnouncement, setShowAnnouncement] = useState(false);
-  const [announcement, setAnnouncement] = useState<any>(null);
+  interface Announcement {
+    title: string;
+    content: string;
+    image?: string;
+    active: boolean;
+  }
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
 
   useEffect(() => {
     // Fetch latest active announcement
