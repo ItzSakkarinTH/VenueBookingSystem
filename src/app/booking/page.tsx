@@ -71,11 +71,23 @@ export default function BookingPage() {
     const [error, setError] = useState('');
 
     // Init
+    // Init
     useEffect(() => {
         setDates(getUpcomingDates());
         const token = getCookie('token');
         setIsLoggedIn(!!token);
     }, []);
+
+    // Zoom Map Logic
+    // Zoom Map Logic
+    const [activeZone, setActiveZone] = useState<string | null>(null);
+    const ZONE_COORDS: Record<string, { scale: number; x: string; y: string }> = {
+        'A': { scale: 3, x: '10%', y: '45%' },
+        'B': { scale: 3, x: '30%', y: '45%' },
+        'C': { scale: 3, x: '50%', y: '45%' },
+        'D': { scale: 3, x: '70%', y: '45%' },
+        'E': { scale: 3, x: '90%', y: '45%' },
+    };
 
     // Fetch Bookings when date changes
     useEffect(() => {
@@ -259,12 +271,85 @@ export default function BookingPage() {
                             </div>
                         </div>
 
+                        {/* Zone Selection & Map Map */}
+                        <div style={{ marginBottom: '2rem' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                                {ZONES.map(z => (
+                                    <button
+                                        key={z.id}
+                                        onClick={() => setActiveZone(activeZone === z.id ? null : z.id)}
+                                        style={{
+                                            padding: '0.5rem 1rem',
+                                            borderRadius: '20px',
+                                            border: `1px solid ${activeZone === z.id ? z.color : '#e2e8f0'}`,
+                                            background: activeZone === z.id ? z.color : 'white',
+                                            color: activeZone === z.id ? 'white' : '#4a5568',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            fontSize: '0.9rem',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {z.name}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setActiveZone(null)}
+                                    style={{
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '20px',
+                                        border: '1px solid #e2e8f0',
+                                        background: !activeZone ? '#4a5568' : 'white',
+                                        color: !activeZone ? 'white' : '#4a5568',
+                                        cursor: 'pointer',
+                                        fontSize: '0.9rem'
+                                    }}
+                                >
+                                    ทั้งหมด
+                                </button>
+                            </div>
+
+                            {/* Map Container */}
+                            <div style={{
+                                width: '100%',
+                                height: '300px',
+                                borderRadius: 'var(--radius-lg)',
+                                overflow: 'hidden',
+                                position: 'relative',
+                                border: '1px solid #e2e8f0',
+                                marginBottom: '1rem',
+                                background: '#f0f4f8'
+                            }}>
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        backgroundImage: 'url("/venue_map.svg")',
+                                        backgroundSize: 'cover',
+                                        backgroundPosition: 'center',
+                                        transition: 'transform 0.5s ease-in-out, transform-origin 0.5s ease-in-out',
+                                        transform: activeZone ? `scale(${ZONE_COORDS[activeZone]?.scale || 1})` : 'scale(1)',
+                                        transformOrigin: activeZone ? `${ZONE_COORDS[activeZone]?.x} ${ZONE_COORDS[activeZone]?.y}` : 'center center',
+                                        cursor: 'pointer'
+                                    }}
+                                    onClick={() => setActiveZone(null)} // Click map to zoom out
+                                >
+                                    {/* Optional: Add markers on map if needed */}
+                                    {!activeZone && (
+                                        <div style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem' }}>
+                                            แตะเพื่อเลือกโซน
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
                         {loading ? (
                             <div style={{ padding: '2rem', textAlign: 'center' }}>Loading locks...</div>
                         ) : (
                             <>
                                 <div className="lock-grid" style={{ marginBottom: '2rem' }}>
-                                    {locks.map((lock) => {
+                                    {locks.filter(l => !activeZone || l.zone === activeZone).map((lock) => {
                                         const isBooked = occupiedLocks.includes(lock.id);
                                         const zone = ZONES.find(z => z.id === lock.zone);
                                         return (
@@ -422,6 +507,6 @@ export default function BookingPage() {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
