@@ -71,14 +71,22 @@ export default function BookingPage() {
         price: number;
     }
 
+    // Booking info for occupied locks (who booked)
+    interface BookingInfo {
+        lockId: string;
+        bookerName: string;
+        status: string;
+    }
+
     // Lock Selection
     const [occupiedLocks, setOccupiedLocks] = useState<string[]>([]);
+    const [bookingsInfo, setBookingsInfo] = useState<BookingInfo[]>([]);
     const [selectedLock, setSelectedLock] = useState<LockDef | null>(null);
     const [locks, setLocks] = useState<LockDef[]>([]);
 
     // User Info
     const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [guestInfo, setGuestInfo] = useState({ name: '', phone: '', idCard: '' });
+    const [userInfo, setUserInfo] = useState<{ name: string; phone: string } | null>(null);
     const [productType, setProductType] = useState('general'); // Default
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -87,12 +95,26 @@ export default function BookingPage() {
     const [bookingConfirmed, setBookingConfirmed] = useState(false);
     const [bookingId, setBookingId] = useState<string>('');
 
-    // Init
+    // View booked lock details
+    const [viewBookedLock, setViewBookedLock] = useState<BookingInfo | null>(null);
+
     // Init
     useEffect(() => {
         setDates(getUpcomingDates());
         const token = getCookie('token');
         setIsLoggedIn(!!token);
+
+        // Fetch user profile if logged in
+        if (token) {
+            fetch('/api/user/profile')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.user) {
+                        setUserInfo({ name: data.user.name, phone: data.user.phone });
+                    }
+                })
+                .catch(() => { });
+        }
     }, []);
 
     // Zone Selection
@@ -105,13 +127,28 @@ export default function BookingPage() {
         // Generate locks for this day
         setLocks(GENERATE_LOCKS(selectedDateInfo.key));
 
-        // Fetch occupied
+        // Fetch occupied with booker info
         setLoading(true);
         fetch(`/api/bookings?date=${selectedDateInfo.date}`)
             .then(res => res.json())
             .then(data => {
                 if (data.bookings) {
+                    // Extract lock IDs
                     setOccupiedLocks(data.bookings.map((b: { lockId: string }) => b.lockId));
+
+                    // Store booking info with booker names
+                    interface BookingResponse {
+                        lockId: string;
+                        userId?: { name?: string };
+                        guestName?: string;
+                        status: string;
+                    }
+                    const infos: BookingInfo[] = data.bookings.map((b: BookingResponse) => ({
+                        lockId: b.lockId,
+                        bookerName: b.userId?.name || b.guestName || 'ไม่ระบุชื่อ',
+                        status: b.status
+                    }));
+                    setBookingsInfo(infos);
                 }
             })
             .catch(err => console.error(err))
@@ -139,17 +176,15 @@ export default function BookingPage() {
 
         if (!selectedDateInfo || !selectedLock) return;
 
-        // Validation for guest
+        // Require login
         if (!isLoggedIn) {
-            if (!guestInfo.name || !guestInfo.phone) {
-                setError('กรุณากรอกชื่อและเบอร์โทรศัพท์');
-                setLoading(false);
-                return;
-            }
+            setError('กรุณาเข้าสู่ระบบก่อนทำการจอง');
+            setLoading(false);
+            return;
         }
 
         try {
-            const payload: Record<string, unknown> = {
+            const payload = {
                 lockId: selectedLock.id,
                 date: selectedDateInfo.date,
                 amount: selectedLock.price,
@@ -157,12 +192,6 @@ export default function BookingPage() {
                 paymentDetails: { ...slipData.qrData, ...slipData.ocrData },
                 productType: productType
             };
-
-            if (!isLoggedIn) {
-                payload.guestName = guestInfo.name;
-                payload.guestPhone = guestInfo.phone;
-                payload.guestIdCard = guestInfo.idCard;
-            }
 
             const res = await fetch('/api/bookings', {
                 method: 'POST',
@@ -493,40 +522,54 @@ export default function BookingPage() {
                                                     {groupLocks.map(lock => {
                                                         const isBooked = occupiedLocks.includes(lock.id);
                                                         const zone = ZONES.find(z => z.id === lock.zone);
+                                                        const bookingInfo = bookingsInfo.find(b => b.lockId === lock.id);
+
+                                                        const handleClick = () => {
+                                                            if (isBooked && bookingInfo) {
+                                                                setViewBookedLock(bookingInfo);
+                                                            } else if (!isBooked) {
+                                                                handleLockClick(lock);
+                                                            }
+                                                        };
+
                                                         return (
                                                             <div
                                                                 key={lock.id}
-                                                                onClick={() => !isBooked && handleLockClick(lock)}
+                                                                onClick={handleClick}
                                                                 style={{
                                                                     width: '55px',
                                                                     height: '55px',
                                                                     borderRadius: '8px',
-                                                                    border: `2px solid ${isBooked ? '#cbd5e0' : zone?.color}`,
-                                                                    background: isBooked ? '#e2e8f0' : 'white',
+                                                                    border: `2px solid ${isBooked ? '#f59e0b' : zone?.color}`,
+                                                                    background: isBooked ? '#fef3c7' : 'white',
                                                                     display: 'flex',
                                                                     flexDirection: 'column',
                                                                     alignItems: 'center',
                                                                     justifyContent: 'center',
-                                                                    cursor: isBooked ? 'not-allowed' : 'pointer',
-                                                                    opacity: isBooked ? 0.5 : 1,
+                                                                    cursor: 'pointer',
+                                                                    opacity: 1,
                                                                     transition: 'all 0.2s',
                                                                     transform: 'scale(1)',
+                                                                    position: 'relative'
                                                                 }}
-                                                                onMouseEnter={(e) => !isBooked && (e.currentTarget.style.transform = 'scale(1.05)')}
+                                                                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
                                                                 onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                                                                title={isBooked ? `จองโดย: ${bookingInfo?.bookerName || 'ไม่ระบุ'}` : 'ว่าง - คลิกเพื่อจอง'}
                                                             >
                                                                 <div style={{
                                                                     fontWeight: 'bold',
                                                                     fontSize: '0.9rem',
-                                                                    color: isBooked ? '#94a3b8' : zone?.color
+                                                                    color: isBooked ? '#b45309' : zone?.color
                                                                 }}>
                                                                     {lock.id}
                                                                 </div>
                                                                 <div style={{
-                                                                    fontSize: '0.65rem',
-                                                                    color: isBooked ? '#94a3b8' : '#64748b'
+                                                                    fontSize: '0.6rem',
+                                                                    color: isBooked ? '#b45309' : '#64748b',
+                                                                    textAlign: 'center',
+                                                                    lineHeight: 1.1
                                                                 }}>
-                                                                    {isBooked ? 'จองแล้ว' : `${lock.price}฿`}
+                                                                    {isBooked ? '🔒 ดูผู้จอง' : `${lock.price}฿`}
                                                                 </div>
                                                             </div>
                                                         );
@@ -560,10 +603,11 @@ export default function BookingPage() {
                                         <div style={{
                                             width: '20px',
                                             height: '20px',
-                                            background: '#e2e8f0',
+                                            background: '#fef3c7',
+                                            border: '2px solid #f59e0b',
                                             borderRadius: '4px'
                                         }} />
-                                        <span>จองแล้ว</span>
+                                        <span>จองแล้ว (คลิกดูผู้จอง)</span>
                                     </div>
                                 </div>
                             </div>
@@ -673,82 +717,107 @@ export default function BookingPage() {
                             {/* Form */}
                             <div>
                                 {!isLoggedIn ? (
-                                    <div style={{ marginBottom: '2rem' }}>
-                                        <h3 style={{ fontSize: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <User size={18} /> ข้อมูลผู้จอง (Guest)
+                                    /* Require Login */
+                                    <div style={{
+                                        padding: '2rem',
+                                        background: '#fff7ed',
+                                        borderRadius: '16px',
+                                        textAlign: 'center',
+                                        border: '1px solid #fed7aa'
+                                    }}>
+                                        <div style={{
+                                            width: '60px',
+                                            height: '60px',
+                                            background: 'linear-gradient(135deg, #ff8c42 0%, #e84a0e 100%)',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            margin: '0 auto 1rem auto'
+                                        }}>
+                                            <User size={28} color="white" />
+                                        </div>
+                                        <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.5rem' }}>
+                                            กรุณาเข้าสู่ระบบ
                                         </h3>
-                                        <div style={{ marginBottom: '1rem' }}>
-                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>ชื่อ-นามสกุล *</label>
-                                            <input
-                                                type="text"
-                                                className="input-field"
-                                                value={guestInfo.name}
-                                                onChange={(e) => setGuestInfo({ ...guestInfo, name: e.target.value })}
-                                                placeholder="กรอกชื่อจริงของคุณ"
-                                            />
+                                        <p style={{ color: '#64748b', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                                            คุณต้องเข้าสู่ระบบหรือสมัครสมาชิกก่อนจองล็อก<br />
+                                            เพื่อให้เราสามารถติดต่อและยืนยันตัวตนได้
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                            <Link
+                                                href="/login"
+                                                style={{
+                                                    padding: '0.75rem 2rem',
+                                                    background: 'linear-gradient(135deg, #ff8c42 0%, #e84a0e 100%)',
+                                                    color: 'white',
+                                                    borderRadius: '10px',
+                                                    textDecoration: 'none',
+                                                    fontWeight: '600',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem'
+                                                }}
+                                            >
+                                                เข้าสู่ระบบ
+                                            </Link>
+                                            <Link
+                                                href="/register"
+                                                style={{
+                                                    padding: '0.75rem 2rem',
+                                                    background: 'white',
+                                                    color: '#e84a0e',
+                                                    border: '2px solid #e84a0e',
+                                                    borderRadius: '10px',
+                                                    textDecoration: 'none',
+                                                    fontWeight: '600'
+                                                }}
+                                            >
+                                                สมัครสมาชิก
+                                            </Link>
                                         </div>
-                                        <div style={{ marginBottom: '1rem' }}>
-                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>เบอร์โทรศัพท์ *</label>
-                                            <input
-                                                type="tel"
-                                                className="input-field"
-                                                value={guestInfo.phone}
-                                                onChange={(e) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
-                                                placeholder="08x-xxx-xxxx"
-                                            />
-                                        </div>
-                                        <div style={{ marginBottom: '1rem' }}>
-                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>เลขบัตรประชาชน (ถ้ามี)</label>
-                                            <input
-                                                type="text"
-                                                className="input-field"
-                                                value={guestInfo.idCard}
-                                                onChange={(e) => setGuestInfo({ ...guestInfo, idCard: e.target.value })}
-                                                placeholder="เพื่อใช้ตรวจสอบสิทธิ์"
-                                            />
-                                        </div>
-                                        <div style={{ padding: '0.75rem', background: '#ebf8ff', color: '#2b6cb0', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', display: 'flex', gap: '0.5rem' }}>
-                                            <Info size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-                                            <span>แนะนำ: <Link href="/login" style={{ textDecoration: 'underline', fontWeight: 600 }}>เข้าสู่ระบบ</Link> เพื่อไม่ต้องกรอกข้อมูลทุกครั้ง</span>
-                                        </div>
+                                        <p style={{ marginTop: '1.5rem', fontSize: '0.8rem', color: '#94a3b8' }}>
+                                            สมัครสมาชิกฟรี ไม่มีค่าใช้จ่าย!
+                                        </p>
                                     </div>
                                 ) : (
-                                    <div style={{ marginBottom: '2rem', padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-                                        <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)' }}>
-                                            <CheckCircle size={18} /> คุณกำลังจองในชื่อสมาชิก
+                                    <div style={{ marginBottom: '2rem', padding: '1rem', background: '#dcfce7', borderRadius: 'var(--radius-md)' }}>
+                                        <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#166534' }}>
+                                            <CheckCircle size={18} /> คุณกำลังจองในชื่อ: {userInfo?.name || 'สมาชิก'}
                                         </h3>
-                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>ข้อมูลของคุณจะถูกบันทึกอัตโนมัติ</p>
+                                        <p style={{ color: '#166534', fontSize: '0.9rem', opacity: 0.8 }}>เบอร์โทร: {userInfo?.phone || '-'}</p>
                                     </div>
+                                )}                                {/* Show these only when logged in */}
+                                {isLoggedIn && (
+                                    <>
+                                        <div style={{ marginBottom: '2rem' }}>
+                                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>ประเภทสินค้าที่ขาย *</h3>
+                                            <select
+                                                className="input-field"
+                                                value={productType}
+                                                onChange={(e) => setProductType(e.target.value)}
+                                                style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}
+                                            >
+                                                <option value="general">สินค้าทั่วไป (เช่น เสื้อผ้า, ของใช้)</option>
+                                                <option value="food">อาหาร / เครื่องดื่ม</option>
+                                                <option value="other">อื่นๆ</option>
+                                            </select>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                                                * โปรดเลือกประเภทสินค้าให้ตรงกับล็อกที่จอง (ล็อก 40-80 สำหรับอาหาร)
+                                            </p>
+                                        </div>
+
+                                        <div style={{ marginBottom: '1rem' }}>
+                                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>ชำระเงิน</h3>
+                                            {error && <div style={{ color: 'var(--error)', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</div>}
+                                            <SlipReaderIntegrated
+                                                expectedAmount={selectedLock.price}
+                                                onSlipVerified={handleSlipVerified}
+                                                onError={(msg) => setError(msg)}
+                                            />
+                                        </div>
+                                    </>
                                 )}
-
-
-
-                                <div style={{ marginBottom: '2rem' }}>
-                                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>ประเภทสินค้าที่ขาย *</h3>
-                                    <select
-                                        className="input-field"
-                                        value={productType}
-                                        onChange={(e) => setProductType(e.target.value)}
-                                        style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}
-                                    >
-                                        <option value="general">สินค้าทั่วไป (เช่น เสื้อผ้า, ของใช้)</option>
-                                        <option value="food">อาหาร / เครื่องดื่ม</option>
-                                        <option value="other">อื่นๆ</option>
-                                    </select>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                                        * โปรดเลือกประเภทสินค้าให้ตรงกับล็อกที่จอง (ล็อก 40-80 สำหรับอาหาร)
-                                    </p>
-                                </div>
-
-                                <div style={{ marginBottom: '1rem' }}>
-                                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>ชำระเงิน</h3>
-                                    {error && <div style={{ color: 'var(--error)', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</div>}
-                                    <SlipReaderIntegrated
-                                        expectedAmount={selectedLock.price}
-                                        onSlipVerified={handleSlipVerified}
-                                        onError={(msg) => setError(msg)}
-                                    />
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -842,7 +911,7 @@ export default function BookingPage() {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px dashed #e2e8f0' }}>
                                         <span style={{ color: '#64748b' }}>ผู้จอง</span>
                                         <span style={{ fontWeight: '500', color: '#1e293b' }}>
-                                            {isLoggedIn ? 'สมาชิก' : guestInfo.name}
+                                            {userInfo?.name || 'สมาชิก'}
                                         </span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px dashed #e2e8f0' }}>
@@ -936,6 +1005,78 @@ export default function BookingPage() {
                     </div>
                 )}
             </div>
+
+            {/* Modal: View Booked Lock Details */}
+            {viewBookedLock && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '1rem'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '16px',
+                        width: '100%',
+                        maxWidth: '320px',
+                        overflow: 'hidden'
+                    }}>
+                        <div style={{
+                            background: '#fef3c7',
+                            padding: '1.25rem',
+                            textAlign: 'center',
+                            borderBottom: '1px solid #fcd34d'
+                        }}>
+                            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔒</div>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#92400e' }}>
+                                ล็อก {viewBookedLock.lockId}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: '#b45309' }}>
+                                ถูกจองแล้ว
+                            </div>
+                        </div>
+                        <div style={{ padding: '1.25rem' }}>
+                            <div style={{ marginBottom: '1rem' }}>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.25rem' }}>จองโดย</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: '600', color: '#1e293b' }}>
+                                    {viewBookedLock.bookerName}
+                                </div>
+                            </div>
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.25rem' }}>สถานะ</div>
+                                <span style={{
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: '20px',
+                                    fontSize: '0.85rem',
+                                    fontWeight: '500',
+                                    background: viewBookedLock.status === 'approved' ? '#dcfce7' : viewBookedLock.status === 'pending' ? '#fef3c7' : '#fee2e2',
+                                    color: viewBookedLock.status === 'approved' ? '#166534' : viewBookedLock.status === 'pending' ? '#92400e' : '#991b1b'
+                                }}>
+                                    {viewBookedLock.status === 'approved' ? '✓ อนุมัติแล้ว' : viewBookedLock.status === 'pending' ? '⏳ รอตรวจสอบ' : '✗ ปฏิเสธ'}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setViewBookedLock(null)}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    background: '#f1f5f9',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontWeight: '500',
+                                    color: '#475569'
+                                }}
+                            >
+                                ปิด
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }
