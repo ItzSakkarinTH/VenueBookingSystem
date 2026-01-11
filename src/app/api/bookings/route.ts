@@ -10,7 +10,11 @@ export async function GET(req: Request) {
 
     if (!date) return NextResponse.json({ error: 'Date required' }, { status: 400 });
 
-    const bookings = await Booking.find({ date }, { lockId: 1, userId: 1, status: 1 });
+    // Include booker info for display - populate userId to get name
+    const bookings = await Booking.find({ date })
+        .populate('userId', 'name phone')
+        .select('lockId userId guestName guestPhone status');
+
     return NextResponse.json({ bookings });
 }
 
@@ -18,42 +22,25 @@ export async function POST(req: Request) {
     await dbConnect();
     const user = await getUserFromCookie();
 
+    // Require login - no guest bookings
+    if (!user) {
+        return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบก่อนทำการจอง' }, { status: 401 });
+    }
+
     try {
         const body = await req.json();
-        const { lockId, date, amount, slipImage, paymentDetails, guestName, guestPhone, guestIdCard } = body;
+        const { lockId, date, amount, slipImage, paymentDetails, productType } = body;
 
-        // Validation for guest
-        if (!user && (!guestName || !guestPhone)) {
-            return NextResponse.json({ error: 'Guest name and phone are required' }, { status: 400 });
-        }
-
-        const bookingData: {
-            lockId: string;
-            date: string;
-            amount: number;
-            slipImage: string;
-            paymentDetails: Record<string, unknown>;
-            status: string;
-            userId?: string;
-            guestName?: string;
-            guestPhone?: string;
-            guestIdCard?: string;
-        } = {
+        const bookingData = {
             lockId,
             date,
             amount,
             slipImage,
             paymentDetails,
-            status: 'pending'
+            productType,
+            status: 'pending',
+            userId: user.userId
         };
-
-        if (user) {
-            bookingData.userId = user.userId;
-        } else {
-            bookingData.guestName = guestName;
-            bookingData.guestPhone = guestPhone;
-            bookingData.guestIdCard = guestIdCard;
-        }
 
         // Create Booking
         // The Unique Index on (lockId, date) will prevent duplicates/race conditions

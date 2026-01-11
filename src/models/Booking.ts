@@ -11,6 +11,7 @@ export interface IBooking extends Document {
     amount: number;
     slipImage?: string;
     paymentDetails?: Record<string, unknown>; // Store OCR/QR data if needed
+    productType?: string; // 'general' | 'food' | 'other'
     createdAt: Date;
     updatedAt: Date;
 }
@@ -31,6 +32,7 @@ const BookingSchema = new Schema<IBooking>(
         amount: { type: Number, required: true },
         slipImage: { type: String },
         paymentDetails: { type: Schema.Types.Mixed },
+        productType: { type: String },
     },
     { timestamps: true }
 );

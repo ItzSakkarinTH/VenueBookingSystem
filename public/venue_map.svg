@@ -1,0 +1,80 @@
+<svg width="1000" height="600" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Style Definition -->
+  <style>
+    .label { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-weight: bold; fill: #4b5563; }
+    .zone-label { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-weight: bold; fill: white; font-size: 24px; text-anchor: middle; dominant-baseline: middle; shadow: 1px 1px 2px black;}
+    .road-label { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14px; fill: #6b7280; font-weight: 500; }
+  </style>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="1000" height="600" fill="#f0f2f5" />
+
+  <!-- Green Areas (Parks/Grass) -->
+  <!-- Left large grass area -->
+  <path d="M0,0 L350,0 L300,600 L0,600 Z" fill="#dcfce7" />
+  <!-- Bottom Right Park (Nong Khaen) -->
+  <path d="M400,550 L1000,550 L1000,600 L400,600 Z" fill="#dcfce7" />
+  <rect x="420" y="550" width="580" height="50" fill="#dcfce7" />
+  
+  <!-- Complex Green Polygon for Nong Khaen Park area -->
+  <path d="M450,500 Q550,480 600,500 T800,520 L950,550 L950,600 L450,600 Z" fill="#dcfce7" />
+
+  <!-- Water Bodies (Nong Khaen) -->
+  <!-- Large Pond Bottom Right -->
+  <path d="M620,420 Q700,400 850,420 T950,450 Q960,550 850,580 T650,550 Q600,500 620,420 Z" fill="#bae6fd" stroke="#7dd3fc" stroke-width="2"/>
+  
+  <!-- Smaller Pond/Section Top Right -->
+  <path d="M620,350 Q750,330 850,350 L850,400 Q750,420 620,400 Z" fill="#bae6fd" stroke="#7dd3fc" stroke-width="2"/>
+
+  <!-- Roads -->
+  <!-- Main Horizontal Road (Thanon Chot Phan) - Slightly tilted -->
+  <g transform="rotate(3, 500, 300)">
+    <rect x="-100" y="280" width="1200" height="50" fill="white" stroke="#d1d5db" stroke-width="2" />
+    <text x="500" y="310" class="road-label" transform="rotate(0)">ถ. โชติพันธ์</text>
+  </g>
+  
+  <!-- Vertical Road Left (Thanon Kasikam) -->
+  <path d="M100,-50 L180,650" stroke="#d1d5db" stroke-width="40" stroke-linecap="butt" fill="none" opacity="0.5"/> <!-- Border -->
+  <path d="M100,-50 L180,650" stroke="white" stroke-width="36" stroke-linecap="butt" fill="none"/>
+
+  <!-- Intersecting Road (Lhang Soon Pa La) -->
+  <path d="M480,320 L350,650" stroke="white" stroke-width="25" stroke-linecap="butt" stroke="#d1d5db"/>
+  <path d="M480,320 L350,650" stroke="white" stroke-width="21" stroke-linecap="butt"/>
+
+  <!-- Landmarks -->
+  <text x="680" y="500" class="label" font-size="16">หนองแคน</text>
+  <circle cx="450" cy="270" r="15" fill="#f87171" stroke="white" stroke-width="2"/>
+  <text x="470" y="275" class="label" font-size="12">จุดนัดพบ</text>
+
+  <!-- ZONES OVERLAY (Based on user image 1) -->
+  <!-- Zone A: Red -->
+  <g transform="rotate(3, 500, 300)">
+      <rect x="50" y="285" width="140" height="40" fill="#ef4444" opacity="0.8" rx="4" stroke="white" stroke-width="2"/>
+      <text x="120" y="310" class="zone-label">A</text>
+  </g>
+
+  <!-- Zone B: Orange -->
+  <g transform="rotate(3, 500, 300)">
+      <rect x="200" y="285" width="140" height="40" fill="#f97316" opacity="0.8" rx="4" stroke="white" stroke-width="2"/>
+      <text x="270" y="310" class="zone-label">B</text>
+  </g>
+
+  <!-- Zone C: Yellow -->
+  <g transform="rotate(3, 500, 300)">
+      <rect x="350" y="285" width="140" height="40" fill="#eab308" opacity="0.8" rx="4" stroke="white" stroke-width="2"/>
+      <text x="420" y="310" class="zone-label">C</text>
+  </g>
+
+  <!-- Zone D: Green -->
+  <g transform="rotate(3, 500, 300)">
+      <rect x="500" y="285" width="140" height="40" fill="#22c55e" opacity="0.8" rx="4" stroke="white" stroke-width="2"/>
+      <text x="570" y="310" class="zone-label">D</text>
+  </g>
+
+  <!-- Zone E: Blue -->
+  <g transform="rotate(3, 500, 300)">
+      <rect x="650" y="285" width="150" height="40" fill="#3b82f6" opacity="0.8" rx="4" stroke="white" stroke-width="2"/>
+      <text x="725" y="310" class="zone-label">E</text>
+  </g>
+
+</svg>

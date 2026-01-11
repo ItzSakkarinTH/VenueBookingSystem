@@ -10,14 +10,19 @@ export async function POST(req: Request) {
     try {
         const { email, password } = await req.json();
 
-        const user = await User.findOne({ email });
+        // Escape special characters for regex
+        const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const user = await User.findOne({ email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') } });
+
         if (!user) {
-            return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+            console.log(`Login failed: User not found for email: ${email}`);
+            return NextResponse.json({ error: 'User not found' }, { status: 401 });
         }
 
         const isMatch = await bcrypt.compare(password, user.password!);
         if (!isMatch) {
-            return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+            console.log(`Login failed: Password mismatch for user: ${email}`);
+            return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
         }
 
         const token = signToken({ userId: user._id.toString(), role: user.role });
