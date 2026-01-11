@@ -606,6 +606,52 @@ export default function BookingPage() {
                                     <span>ยอดชำระ:</span>
                                     <span>{selectedLock.price} บาท</span>
                                 </div>
+
+                                {/* Bank Account Info */}
+                                <div style={{
+                                    marginTop: '1.5rem',
+                                    padding: '1rem',
+                                    background: 'linear-gradient(135deg, #00a651 0%, #00873e 100%)',
+                                    borderRadius: '12px',
+                                    color: 'white'
+                                }}>
+                                    <div style={{ fontSize: '0.85rem', opacity: 0.9, marginBottom: '0.5rem' }}>
+                                        โอนเงินไปที่
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                                        <div style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            background: 'white',
+                                            borderRadius: '8px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 'bold',
+                                            color: '#00a651',
+                                            fontSize: '0.7rem'
+                                        }}>
+                                            KBANK
+                                        </div>
+                                        <div>
+                                            <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>กสิกรไทย</div>
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        background: 'rgba(255,255,255,0.2)',
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: '8px',
+                                        marginBottom: '0.5rem'
+                                    }}>
+                                        <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>เลขบัญชี</div>
+                                        <div style={{ fontSize: '1.3rem', fontWeight: 'bold', letterSpacing: '1px' }}>
+                                            116-8-88618-3
+                                        </div>
+                                    </div>
+                                    <div style={{ fontSize: '0.95rem' }}>
+                                        ชื่อบัญชี: <strong>ศักรินทร์ หาญทอง</strong>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Form */}
