@@ -453,12 +453,14 @@ export default function BookingPage() {
                                     </div>
                                 </div>
 
-                                {/* Lock Grid - 3 Groups of 3x3 */}
+                                {/* Lock Grid - 3 Groups of 3x3 in a row */}
                                 <div style={{
                                     display: 'flex',
-                                    justifyContent: 'center',
-                                    gap: '2rem',
-                                    flexWrap: 'wrap'
+                                    justifyContent: 'flex-start',
+                                    gap: '1rem',
+                                    flexWrap: 'nowrap',
+                                    overflowX: 'auto',
+                                    paddingBottom: '0.5rem'
                                 }}>
                                     {[0, 1, 2].map(groupIndex => {
                                         const groupLocks = locks
