@@ -411,49 +411,166 @@ export default function BookingPage() {
                         </div>
 
                         {loading ? (
-                            <div style={{ padding: '2rem', textAlign: 'center' }}>Loading locks...</div>
-                        ) : (
-                            <>
-                                <div className="lock-grid" style={{ marginBottom: '2rem' }}>
-                                    {locks.filter(l => !activeZone || l.zone === activeZone).map((lock) => {
-                                        const isBooked = occupiedLocks.includes(lock.id);
-                                        const zone = ZONES.find(z => z.id === lock.zone);
+                            <div style={{ padding: '2rem', textAlign: 'center' }}>กำลังโหลด...</div>
+                        ) : activeZone ? (
+                            /* Show detailed lock grid when zone is selected */
+                            <div style={{
+                                background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+                                borderRadius: 'var(--radius-lg)',
+                                padding: '1.5rem',
+                                border: '1px solid #e2e8f0'
+                            }}>
+                                {/* Zone Header */}
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '1rem',
+                                    marginBottom: '1.5rem'
+                                }}>
+                                    <div style={{
+                                        width: '50px',
+                                        height: '50px',
+                                        background: ZONES.find(z => z.id === activeZone)?.color,
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: 'white',
+                                        fontWeight: 'bold',
+                                        fontSize: '1.5rem',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                    }}>
+                                        {activeZone}
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#1e293b' }}>
+                                            {ZONES.find(z => z.id === activeZone)?.name}
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                            เลือกล็อกที่ต้องการจอง • {ZONES.find(z => z.id === activeZone)?.price} บาท/ล็อก
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Lock Grid - 3 Groups of 3x3 */}
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    gap: '2rem',
+                                    flexWrap: 'wrap'
+                                }}>
+                                    {[0, 1, 2].map(groupIndex => {
+                                        const groupLocks = locks
+                                            .filter(l => l.zone === activeZone)
+                                            .slice(groupIndex * 9, (groupIndex + 1) * 9);
+
                                         return (
-                                            <div
-                                                key={lock.id}
-                                                className={`lock-item ${isBooked ? 'lock-booked' : 'lock-available'}`}
-                                                onClick={() => !isBooked && handleLockClick(lock)}
-                                                title={`${lock.label} - ${lock.price} บาท`}
-                                                style={{
-                                                    position: 'relative',
-                                                    borderColor: isBooked ? '#cbd5e0' : zone?.color,
-                                                    color: isBooked ? 'white' : zone?.color,
-                                                    background: isBooked ? '#cbd5e0' : 'white',
-                                                    cursor: isBooked ? 'not-allowed' : 'pointer',
-                                                    opacity: isBooked ? 0.6 : 1
-                                                }}
-                                            >
-                                                <div style={{ textAlign: 'center' }}>
-                                                    <div style={{ fontWeight: 'bold' }}>{lock.id}</div>
-                                                    <div style={{ fontSize: '0.7rem' }}>{lock.price}฿</div>
+                                            <div key={groupIndex} style={{
+                                                background: 'white',
+                                                borderRadius: '12px',
+                                                padding: '1rem',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                                            }}>
+                                                <div style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: 'repeat(3, 1fr)',
+                                                    gap: '8px'
+                                                }}>
+                                                    {groupLocks.map(lock => {
+                                                        const isBooked = occupiedLocks.includes(lock.id);
+                                                        const zone = ZONES.find(z => z.id === lock.zone);
+                                                        return (
+                                                            <div
+                                                                key={lock.id}
+                                                                onClick={() => !isBooked && handleLockClick(lock)}
+                                                                style={{
+                                                                    width: '55px',
+                                                                    height: '55px',
+                                                                    borderRadius: '8px',
+                                                                    border: `2px solid ${isBooked ? '#cbd5e0' : zone?.color}`,
+                                                                    background: isBooked ? '#e2e8f0' : 'white',
+                                                                    display: 'flex',
+                                                                    flexDirection: 'column',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    cursor: isBooked ? 'not-allowed' : 'pointer',
+                                                                    opacity: isBooked ? 0.5 : 1,
+                                                                    transition: 'all 0.2s',
+                                                                    transform: 'scale(1)',
+                                                                }}
+                                                                onMouseEnter={(e) => !isBooked && (e.currentTarget.style.transform = 'scale(1.05)')}
+                                                                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                                                            >
+                                                                <div style={{
+                                                                    fontWeight: 'bold',
+                                                                    fontSize: '0.9rem',
+                                                                    color: isBooked ? '#94a3b8' : zone?.color
+                                                                }}>
+                                                                    {lock.id}
+                                                                </div>
+                                                                <div style={{
+                                                                    fontSize: '0.65rem',
+                                                                    color: isBooked ? '#94a3b8' : '#64748b'
+                                                                }}>
+                                                                    {isBooked ? 'จองแล้ว' : `${lock.price}฿`}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'center', fontSize: '0.85rem' }}>
-                                    {ZONES.map(z => (
-                                        <div key={z.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <div style={{ width: 12, height: 12, backgroundColor: z.color, borderRadius: 2 }}></div>
-                                            <span>{z.name}</span>
-                                        </div>
-                                    ))}
+
+                                {/* Legend */}
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    gap: '2rem',
+                                    marginTop: '1.5rem',
+                                    fontSize: '0.8rem',
+                                    color: '#64748b'
+                                }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <div style={{ width: 12, height: 12, backgroundColor: '#cbd5e0', borderRadius: 2 }}></div>
-                                        <span>ไม่ว่าง</span>
+                                        <div style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            border: `2px solid ${ZONES.find(z => z.id === activeZone)?.color}`,
+                                            borderRadius: '4px',
+                                            background: 'white'
+                                        }} />
+                                        <span>ว่าง</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <div style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            background: '#e2e8f0',
+                                            borderRadius: '4px'
+                                        }} />
+                                        <span>จองแล้ว</span>
                                     </div>
                                 </div>
-                            </>
+                            </div>
+                        ) : (
+                            /* Prompt to select a zone */
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '3rem',
+                                background: '#f8fafc',
+                                borderRadius: 'var(--radius-lg)',
+                                border: '2px dashed #e2e8f0'
+                            }}>
+                                <MapPin size={40} color="#94a3b8" style={{ marginBottom: '1rem' }} />
+                                <div style={{ color: '#64748b', fontSize: '1rem' }}>
+                                    กรุณาเลือกโซนจากแผนที่ด้านบน
+                                </div>
+                                <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                                    แตะที่ปุ่มโซน หรือ กล่องสีบนแผนที่เพื่อดูล็อกที่ว่าง
+                                </div>
+                            </div>
                         )}
                     </div>
                 )}
