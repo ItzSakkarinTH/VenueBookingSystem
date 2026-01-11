@@ -611,45 +611,50 @@ export default function BookingPage() {
                                 <div style={{
                                     marginTop: '1.5rem',
                                     padding: '1rem',
-                                    background: 'linear-gradient(135deg, #00a651 0%, #00873e 100%)',
+                                    background: 'white',
                                     borderRadius: '12px',
-                                    color: 'white'
+                                    border: '1px solid #e2e8f0'
                                 }}>
-                                    <div style={{ fontSize: '0.85rem', opacity: 0.9, marginBottom: '0.5rem' }}>
+                                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>
                                         โอนเงินไปที่
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                                         <div style={{
                                             width: '40px',
                                             height: '40px',
-                                            background: 'white',
+                                            background: '#00a651',
                                             borderRadius: '8px',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             fontWeight: 'bold',
-                                            color: '#00a651',
-                                            fontSize: '0.7rem'
+                                            color: 'white',
+                                            fontSize: '0.6rem'
                                         }}>
                                             KBANK
                                         </div>
-                                        <div>
-                                            <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>กสิกรไทย</div>
+                                        <div style={{ fontWeight: '600', fontSize: '1rem', color: '#1e293b' }}>
+                                            ธนาคารกสิกรไทย
                                         </div>
                                     </div>
                                     <div style={{
-                                        background: 'rgba(255,255,255,0.2)',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
                                         padding: '0.75rem 1rem',
+                                        background: '#fff7ed',
                                         borderRadius: '8px',
-                                        marginBottom: '0.5rem'
+                                        marginBottom: '0.75rem'
                                     }}>
-                                        <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>เลขบัญชี</div>
-                                        <div style={{ fontSize: '1.3rem', fontWeight: 'bold', letterSpacing: '1px' }}>
-                                            116-8-88618-3
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', color: '#78716c' }}>เลขบัญชี</div>
+                                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#1e293b', letterSpacing: '0.5px' }}>
+                                                116-8-88618-3
+                                            </div>
                                         </div>
                                     </div>
-                                    <div style={{ fontSize: '0.95rem' }}>
-                                        ชื่อบัญชี: <strong>ศักรินทร์ หาญทอง</strong>
+                                    <div style={{ fontSize: '0.9rem', color: '#4b5563' }}>
+                                        ชื่อบัญชี: <strong style={{ color: '#1e293b' }}>ศักรินทร์ หาญทอง</strong>
                                     </div>
                                 </div>
                             </div>
