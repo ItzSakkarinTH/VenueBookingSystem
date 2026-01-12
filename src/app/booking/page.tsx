@@ -191,6 +191,7 @@ export default function BookingPage() {
         try {
             const payload = {
                 lockId: selectedLock.id,
+                zone: selectedLock.zone, // Add zone to booking
                 date: selectedDateInfo.date,
                 amount: selectedLock.price,
                 slipImage: slipData.slipImage,

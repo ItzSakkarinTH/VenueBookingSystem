@@ -6,6 +6,7 @@ export interface IBooking extends Document {
     guestPhone?: string;
     guestIdCard?: string;
     lockId: string; // e.g. 'A1', 'B2'
+    zone?: string; // e.g. 'A', 'B', 'C'
     date: string; // YYYY-MM-DD
     status: 'pending' | 'approved' | 'rejected';
     amount: number;
@@ -23,6 +24,7 @@ const BookingSchema = new Schema<IBooking>(
         guestPhone: { type: String },
         guestIdCard: { type: String },
         lockId: { type: String, required: true },
+        zone: { type: String }, // Zone A, B, C, etc.
         date: { type: String, required: true }, // Format: YYYY-MM-DD
         status: {
             type: String,
