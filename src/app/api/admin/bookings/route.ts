@@ -5,7 +5,8 @@ import Booking from '@/models/Booking';
 export async function GET() {
     await dbConnect();
     // Role check should be here
-    const bookings = await Booking.find({}).populate('userId', 'name phone').sort({ createdAt: -1 });
+    // Populate user data including email and idCard for admin verification
+    const bookings = await Booking.find({}).populate('userId', 'name phone email idCard').sort({ createdAt: -1 });
     return NextResponse.json({ bookings });
 }
 
