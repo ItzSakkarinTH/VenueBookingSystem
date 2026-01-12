@@ -4,9 +4,19 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { MapPin, Bell, X, ArrowRight, Clock, Users, Sparkles, ShieldCheck } from 'lucide-react';
+import { getCookie } from 'cookies-next';
 
 export default function HomePage() {
   const [showAnnouncement, setShowAnnouncement] = useState(false);
+  // Check login status from cookies using lazy initializer
+  const [isLoggedIn] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const nameCookie = getCookie('name');
+      const roleCookie = getCookie('role');
+      return !!(nameCookie || roleCookie);
+    }
+    return false;
+  });
   interface Announcement {
     title: string;
     content: string;
@@ -152,18 +162,20 @@ export default function HomePage() {
               <ArrowRight size={20} />
             </Link>
 
-            <Link href="/login" style={{
-              color: 'white',
-              textDecoration: 'none',
-              fontSize: '1rem',
-              opacity: 0.9,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <span>มีบัญชีแล้ว?</span>
-              <span style={{ textDecoration: 'underline' }}>เข้าสู่ระบบ</span>
-            </Link>
+            {!isLoggedIn && (
+              <Link href="/login" style={{
+                color: 'white',
+                textDecoration: 'none',
+                fontSize: '1rem',
+                opacity: 0.9,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>มีบัญชีแล้ว?</span>
+                <span style={{ textDecoration: 'underline' }}>เข้าสู่ระบบ</span>
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -291,32 +303,59 @@ export default function HomePage() {
         textAlign: 'center'
       }}>
         <p style={{ fontSize: '1.1rem', marginBottom: '0.5rem', opacity: 0.9 }}>
-          พร้อมเริ่มขายของหรือยัง?
+          {isLoggedIn ? 'พร้อมจองล็อกแล้วหรือยัง?' : 'พร้อมเริ่มขายของหรือยัง?'}
         </p>
         <p style={{ fontSize: '0.9rem', opacity: 0.6 }}>
-          สมัครสมาชิกวันนี้ จองได้ทันที
+          {isLoggedIn ? 'เลือกโซนและล็อกที่ต้องการได้เลย!' : 'สมัครสมาชิกวันนี้ จองได้ทันที'}
         </p>
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/register" style={{
-            background: 'white',
-            color: '#1a1a2e',
-            padding: '12px 28px',
-            borderRadius: '50px',
-            fontWeight: '600',
-            textDecoration: 'none'
-          }}>
-            สมัครสมาชิก
-          </Link>
-          <Link href="/booking" style={{
-            border: '1px solid rgba(255,255,255,0.3)',
-            color: 'white',
-            padding: '12px 28px',
-            borderRadius: '50px',
-            fontWeight: '500',
-            textDecoration: 'none'
-          }}>
-            จองเลย (ไม่ต้องสมัคร)
-          </Link>
+          {isLoggedIn ? (
+            <>
+              <Link href="/booking" style={{
+                background: 'white',
+                color: '#1a1a2e',
+                padding: '12px 28px',
+                borderRadius: '50px',
+                fontWeight: '600',
+                textDecoration: 'none'
+              }}>
+                จองล็อกเลย
+              </Link>
+              <Link href="/my-bookings" style={{
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: 'white',
+                padding: '12px 28px',
+                borderRadius: '50px',
+                fontWeight: '500',
+                textDecoration: 'none'
+              }}>
+                ดูประวัติการจอง
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/register" style={{
+                background: 'white',
+                color: '#1a1a2e',
+                padding: '12px 28px',
+                borderRadius: '50px',
+                fontWeight: '600',
+                textDecoration: 'none'
+              }}>
+                สมัครสมาชิก
+              </Link>
+              <Link href="/booking" style={{
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: 'white',
+                padding: '12px 28px',
+                borderRadius: '50px',
+                fontWeight: '500',
+                textDecoration: 'none'
+              }}>
+                จองเลย
+              </Link>
+            </>
+          )}
         </div>
       </section>
 
