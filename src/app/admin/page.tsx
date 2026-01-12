@@ -7,7 +7,7 @@ import { Calendar, Filter, Eye, CheckCircle, XCircle, ChevronLeft, ChevronRight,
 
 interface Booking {
     _id: string;
-    userId?: User;
+    userId?: User & { email?: string; idCard?: string };
     guestInfo?: {
         name: string;
         phone: string;
@@ -717,7 +717,7 @@ export default function AdminDashboard() {
                 )}
             </div>
 
-            {/* Booking Detail Modal */}
+            {/* Booking Detail Modal - Enhanced */}
             {selectedBooking && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -733,7 +733,7 @@ export default function AdminDashboard() {
                         background: 'white',
                         borderRadius: '20px',
                         width: '100%',
-                        maxWidth: '480px',
+                        maxWidth: '550px',
                         maxHeight: '90vh',
                         overflow: 'auto'
                     }}>
@@ -747,9 +747,14 @@ export default function AdminDashboard() {
                             alignItems: 'center',
                             borderRadius: '20px 20px 0 0'
                         }}>
-                            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600' }}>
-                                รายละเอียดการจอง
-                            </h3>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600' }}>
+                                    รายละเอียดการจอง
+                                </h3>
+                                <div style={{ fontSize: '0.8rem', opacity: 0.9, marginTop: '0.25rem' }}>
+                                    รหัส: #{selectedBooking._id.slice(-8).toUpperCase()}
+                                </div>
+                            </div>
                             <button
                                 onClick={() => setSelectedBooking(null)}
                                 style={{
@@ -767,18 +772,43 @@ export default function AdminDashboard() {
 
                         {/* Content */}
                         <div style={{ padding: '1.5rem' }}>
-                            {/* Lock & Status */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                <div>
-                                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>ล็อก</div>
-                                    <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#e84a0e' }}>
-                                        {selectedBooking.lockId}
+                            {/* Lock & Status Header */}
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '1.5rem',
+                                padding: '1rem',
+                                background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+                                borderRadius: '16px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <div style={{
+                                        width: '60px',
+                                        height: '60px',
+                                        background: 'linear-gradient(135deg, #ff8c42 0%, #e84a0e 100%)',
+                                        borderRadius: '14px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: 'white',
+                                        boxShadow: '0 4px 12px rgba(232, 74, 14, 0.3)'
+                                    }}>
+                                        <div style={{ fontSize: '0.7rem', opacity: 0.9 }}>ล็อก</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{selectedBooking.lockId}</div>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>วันที่จอง</div>
+                                        <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '1rem' }}>
+                                            {formatThaiDate(selectedBooking.date)}
+                                        </div>
                                     </div>
                                 </div>
                                 <span style={{
                                     padding: '0.5rem 1rem',
                                     borderRadius: '20px',
-                                    fontSize: '0.9rem',
+                                    fontSize: '0.85rem',
                                     fontWeight: '600',
                                     background: selectedBooking.status === 'approved' ? '#dcfce7' : selectedBooking.status === 'pending' ? '#fef3c7' : '#fee2e2',
                                     color: selectedBooking.status === 'approved' ? '#166534' : selectedBooking.status === 'pending' ? '#92400e' : '#991b1b',
@@ -787,48 +817,149 @@ export default function AdminDashboard() {
                                 </span>
                             </div>
 
-                            {/* Details Grid */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: '1fr 1fr',
-                                gap: '1rem',
-                                marginBottom: '1.5rem',
-                                background: '#f8fafc',
-                                padding: '1rem',
-                                borderRadius: '12px'
-                            }}>
-                                <div>
-                                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>วันที่จอง</div>
-                                    <div style={{ fontWeight: '600', color: '#1e293b' }}>{formatThaiDate(selectedBooking.date)}</div>
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>ยอดเงิน</div>
-                                    <div style={{ fontWeight: '700', color: '#e84a0e', fontSize: '1.1rem' }}>{selectedBooking.amount} บาท</div>
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>ผู้จอง</div>
-                                    <div style={{ fontWeight: '500', color: '#1e293b' }}>
-                                        {selectedBooking.userId?.name || selectedBooking.guestInfo?.name || '-'}
+                            {/* Booker Information Section */}
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <h4 style={{
+                                    fontSize: '0.85rem',
+                                    fontWeight: '600',
+                                    color: '#e84a0e',
+                                    marginBottom: '0.75rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                }}>
+                                    <Users size={16} /> ข้อมูลผู้จอง
+                                </h4>
+                                <div style={{
+                                    background: '#f8fafc',
+                                    padding: '1rem',
+                                    borderRadius: '12px',
+                                    border: '1px solid #e2e8f0'
+                                }}>
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gap: '1rem'
+                                    }}>
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>ชื่อ-นามสกุล</div>
+                                            <div style={{ fontWeight: '600', color: '#1e293b' }}>
+                                                {selectedBooking.userId?.name || selectedBooking.guestInfo?.name || '-'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>เบอร์โทรศัพท์</div>
+                                            <div style={{ fontWeight: '500', color: '#1e293b' }}>
+                                                {selectedBooking.userId?.phone || selectedBooking.guestInfo?.phone || '-'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>อีเมล</div>
+                                            <div style={{ fontWeight: '500', color: '#1e293b' }}>
+                                                {selectedBooking.userId?.email || '-'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>เลขบัตรประชาชน</div>
+                                            <div style={{ fontWeight: '500', color: '#1e293b' }}>
+                                                {selectedBooking.userId?.idCard || selectedBooking.guestInfo?.idCard || '-'}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div>
-                                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>เบอร์โทร</div>
-                                    <div style={{ fontWeight: '500', color: '#1e293b' }}>
-                                        {selectedBooking.userId?.phone || selectedBooking.guestInfo?.phone || '-'}
+                            </div>
+
+                            {/* Booking Details Section */}
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <h4 style={{
+                                    fontSize: '0.85rem',
+                                    fontWeight: '600',
+                                    color: '#e84a0e',
+                                    marginBottom: '0.75rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                }}>
+                                    <Calendar size={16} /> รายละเอียดการจอง
+                                </h4>
+                                <div style={{
+                                    background: '#f8fafc',
+                                    padding: '1rem',
+                                    borderRadius: '12px',
+                                    border: '1px solid #e2e8f0'
+                                }}>
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gap: '1rem'
+                                    }}>
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>รหัสการจอง</div>
+                                            <div style={{ fontWeight: '600', color: '#1e293b', fontFamily: 'monospace' }}>
+                                                #{selectedBooking._id.slice(-8).toUpperCase()}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>วันที่ทำรายการ</div>
+                                            <div style={{ fontWeight: '500', color: '#1e293b' }}>
+                                                {selectedBooking.createdAt ? new Date(selectedBooking.createdAt).toLocaleString('th-TH', {
+                                                    day: 'numeric',
+                                                    month: 'short',
+                                                    year: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                }) : '-'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>ตำแหน่ง</div>
+                                            <div style={{ fontWeight: '600', color: '#1e293b' }}>
+                                                ล็อก {selectedBooking.lockId} {selectedBooking.zone ? `(โซน ${selectedBooking.zone})` : ''}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>ประเภทสินค้า</div>
+                                            <div style={{ fontWeight: '500', color: '#1e293b' }}>
+                                                {selectedBooking.productType === 'general' ? 'สินค้าทั่วไป' :
+                                                    selectedBooking.productType === 'food' ? 'อาหาร' :
+                                                        selectedBooking.productType === 'clothing' ? 'เสื้อผ้า' :
+                                                            selectedBooking.productType || '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Amount Highlight */}
+                                    <div style={{
+                                        marginTop: '1rem',
+                                        padding: '0.75rem 1rem',
+                                        background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+                                        borderRadius: '10px',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                    }}>
+                                        <span style={{ fontSize: '0.9rem', color: '#9a3412', fontWeight: '500' }}>ยอดชำระ</span>
+                                        <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#e84a0e' }}>
+                                            {selectedBooking.amount} บาท
+                                        </span>
                                     </div>
                                 </div>
-                                {selectedBooking.productType && (
-                                    <div style={{ gridColumn: 'span 2' }}>
-                                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>ประเภทสินค้า</div>
-                                        <div style={{ fontWeight: '500', color: '#1e293b' }}>{selectedBooking.productType}</div>
-                                    </div>
-                                )}
                             </div>
 
                             {/* Slip Image */}
                             {selectedBooking.slipImage && (
                                 <div style={{ marginBottom: '1.5rem' }}>
-                                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.5rem', fontWeight: '500' }}>สลิปการโอนเงิน</div>
+                                    <h4 style={{
+                                        fontSize: '0.85rem',
+                                        fontWeight: '600',
+                                        color: '#e84a0e',
+                                        marginBottom: '0.75rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem'
+                                    }}>
+                                        📄 หลักฐานการชำระเงิน
+                                    </h4>
                                     <a href={selectedBooking.slipImage} target="_blank" rel="noopener noreferrer">
                                         <Image
                                             src={selectedBooking.slipImage}
@@ -838,13 +969,47 @@ export default function AdminDashboard() {
                                             style={{
                                                 width: '100%',
                                                 height: 'auto',
-                                                maxHeight: '300px',
+                                                maxHeight: '350px',
                                                 objectFit: 'contain',
                                                 borderRadius: '12px',
-                                                border: '1px solid #e2e8f0'
+                                                border: '1px solid #e2e8f0',
+                                                background: '#f8fafc'
                                             }}
                                         />
                                     </a>
+                                </div>
+                            )}
+
+                            {/* Status Message */}
+                            {selectedBooking.status === 'pending' && (
+                                <div style={{
+                                    marginBottom: '1.5rem',
+                                    padding: '1rem',
+                                    background: '#fff7ed',
+                                    borderRadius: '12px',
+                                    border: '1px solid #fed7aa',
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    gap: '0.75rem'
+                                }}>
+                                    <div style={{
+                                        width: '24px',
+                                        height: '24px',
+                                        background: '#f59e0b',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0
+                                    }}>
+                                        <span style={{ fontSize: '0.8rem' }}>⏳</span>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.25rem' }}>รอการตรวจสอบ</div>
+                                        <div style={{ fontSize: '0.85rem', color: '#b45309' }}>
+                                            กรุณาตรวจสอบหลักฐานการชำระเงินและข้อมูลผู้จอง จากนั้นอนุมัติหรือปฏิเสธรายการนี้
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -866,7 +1031,8 @@ export default function AdminDashboard() {
                                             borderRadius: '12px',
                                             cursor: 'pointer',
                                             fontWeight: '600',
-                                            fontSize: '1rem'
+                                            fontSize: '1rem',
+                                            boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)'
                                         }}
                                     >
                                         <CheckCircle size={18} /> อนุมัติ
@@ -886,12 +1052,33 @@ export default function AdminDashboard() {
                                             borderRadius: '12px',
                                             cursor: 'pointer',
                                             fontWeight: '600',
-                                            fontSize: '1rem'
+                                            fontSize: '1rem',
+                                            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
                                         }}
                                     >
                                         <XCircle size={18} /> ปฏิเสธ
                                     </button>
                                 </div>
+                            )}
+
+                            {/* Close button for non-pending */}
+                            {selectedBooking.status !== 'pending' && (
+                                <button
+                                    onClick={() => setSelectedBooking(null)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.875rem',
+                                        background: '#f1f5f9',
+                                        color: '#475569',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        cursor: 'pointer',
+                                        fontWeight: '600',
+                                        fontSize: '1rem'
+                                    }}
+                                >
+                                    ปิด
+                                </button>
                             )}
                         </div>
                     </div>
