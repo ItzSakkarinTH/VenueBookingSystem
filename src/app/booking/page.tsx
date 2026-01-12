@@ -101,11 +101,16 @@ export default function BookingPage() {
     // Init
     useEffect(() => {
         setDates(getUpcomingDates());
-        const token = getCookie('token');
-        setIsLoggedIn(!!token);
+
+        // Use 'name' or 'role' cookie to check login status
+        // 'token' is httpOnly and cannot be read from client-side JavaScript
+        const nameCookie = getCookie('name');
+        const roleCookie = getCookie('role');
+        const isUserLoggedIn = !!(nameCookie || roleCookie);
+        setIsLoggedIn(isUserLoggedIn);
 
         // Fetch user profile if logged in
-        if (token) {
+        if (isUserLoggedIn) {
             fetch('/api/user/profile')
                 .then(res => res.json())
                 .then(data => {
@@ -186,6 +191,7 @@ export default function BookingPage() {
         try {
             const payload = {
                 lockId: selectedLock.id,
+                zone: selectedLock.zone, // Add zone to booking
                 date: selectedDateInfo.date,
                 amount: selectedLock.price,
                 slipImage: slipData.slipImage,

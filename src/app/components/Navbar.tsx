@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, User, LogOut, Home, Menu, ChevronDown } from 'lucide-react';
+import { ShoppingBag, User, LogOut, Home, Menu, ChevronDown, Receipt } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { getCookie, deleteCookie } from 'cookies-next';
 import { useRouter } from 'next/navigation';
@@ -57,6 +57,11 @@ export default function Navbar() {
         { href: '/', label: 'หน้าแรก', icon: Home },
         { href: '/booking', label: 'จองล็อก', icon: ShoppingBag },
     ];
+
+    // Add "My Bookings" link for logged-in users
+    if (isLoggedIn) {
+        navLinks.push({ href: '/my-bookings', label: 'การจองของฉัน', icon: Receipt });
+    }
 
     if (isLoggedIn && role === 'admin') {
         navLinks.push({ href: '/admin', label: 'ผู้ดูแลระบบ', icon: User });
@@ -159,6 +164,19 @@ export default function Navbar() {
                                     overflow: 'hidden',
                                     zIndex: 51
                                 }}>
+                                    <Link href="/my-bookings"
+                                        onClick={() => setIsUserMenuOpen(false)}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                            padding: '0.75rem 1rem',
+                                            color: 'var(--text-main)',
+                                            borderBottom: '1px solid #f0f0f0'
+                                        }}
+                                        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => e.currentTarget.style.background = '#f7fafc'}
+                                        onMouseLeave={(e: React.MouseEvent<HTMLElement>) => e.currentTarget.style.background = 'white'}
+                                    >
+                                        <Receipt size={16} /> การจองของฉัน
+                                    </Link>
                                     <Link href="/profile"
                                         onClick={() => setIsUserMenuOpen(false)}
                                         style={{
@@ -249,6 +267,9 @@ export default function Navbar() {
                             <div style={{ padding: '0.5rem 0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
                                 สวัสดี, {userName || 'User'}
                             </div>
+                            <Link href="/my-bookings" onClick={() => setIsMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem' }}>
+                                <Receipt size={20} /> การจองของฉัน
+                            </Link>
                             <Link href="/profile" onClick={() => setIsMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem' }}>
                                 <User size={20} /> โปรไฟล์
                             </Link>
