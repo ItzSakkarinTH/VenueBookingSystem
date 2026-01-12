@@ -914,7 +914,7 @@ export default function AdminDashboard() {
                                         <div>
                                             <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>ตำแหน่ง</div>
                                             <div style={{ fontWeight: '600', color: '#1e293b' }}>
-                                                ล็อก {selectedBooking.lockId} {selectedBooking.zone ? `(โซน ${selectedBooking.zone})` : ''}
+                                                ล็อก {selectedBooking.lockId} (โซน {selectedBooking.zone || selectedBooking.lockId.charAt(0)})
                                             </div>
                                         </div>
                                         <div>

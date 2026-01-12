@@ -29,10 +29,11 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        const { lockId, date, amount, slipImage, paymentDetails, productType } = body;
+        const { lockId, zone, date, amount, slipImage, paymentDetails, productType } = body;
 
         const bookingData = {
             lockId,
+            zone, // Store zone information
             date,
             amount,
             slipImage,

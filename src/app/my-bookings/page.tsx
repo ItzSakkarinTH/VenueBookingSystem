@@ -21,6 +21,7 @@ import {
 interface Booking {
     _id: string;
     lockId: string;
+    zone?: string;
     date: string;
     status: 'pending' | 'approved' | 'rejected';
     amount: number;
@@ -325,7 +326,7 @@ function BookingCard({
                             {formatDate(booking.date)}
                         </div>
                         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                            ล็อก {booking.lockId} • {booking.amount} บาท
+                            ล็อก {booking.lockId} • โซน {booking.zone || booking.lockId.charAt(0)} • {booking.amount} บาท
                         </div>
                     </div>
                 </div>
@@ -367,6 +368,7 @@ function BookingCard({
                         <DetailItem label="รหัสการจอง" value={booking._id.slice(-8).toUpperCase()} />
                         <DetailItem label="วันที่จอง" value={formatCreatedAt(booking.createdAt)} />
                         <DetailItem label="ตำแหน่ง" value={`ล็อก ${booking.lockId}`} />
+                        <DetailItem label="โซน" value={`โซน ${booking.zone || booking.lockId.charAt(0)}`} />
                         <DetailItem label="ยอดชำระ" value={`${booking.amount} บาท`} />
                         <DetailItem label="ประเภทสินค้า" value={productTypeLabels[booking.productType || 'general'] || booking.productType || '-'} />
                         <DetailItem label="สถานะ" value={status.label} color={status.color} />
