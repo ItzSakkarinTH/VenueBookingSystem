@@ -27,6 +27,7 @@ interface Booking {
     amount: number;
     productType?: string;
     createdAt: string;
+    approvedAt?: string;
     slipImage?: string;
 }
 
@@ -422,7 +423,14 @@ function BookingCard({
                             gap: '0.5rem'
                         }}>
                             <CheckCircle size={16} />
-                            การจองได้รับการอนุมัติแล้ว พบกันที่ตลาดนัด!
+                            <div>
+                                <div>การจองได้รับการอนุมัติแล้ว พบกันที่ตลาดนัด!</div>
+                                {booking.approvedAt && (
+                                    <div style={{ fontSize: '0.75rem', marginTop: '0.25rem', opacity: 0.8 }}>
+                                        อนุมัติเมื่อ: {formatCreatedAt(booking.approvedAt)}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                     {booking.status === 'rejected' && (

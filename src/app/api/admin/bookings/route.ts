@@ -13,6 +13,13 @@ export async function GET() {
 export async function PUT(req: Request) {
     await dbConnect();
     const { id, status } = await req.json();
-    const booking = await Booking.findByIdAndUpdate(id, { status }, { new: true });
+
+    // Set approvedAt if status is being set to approved
+    const updateData: { status: string; approvedAt?: Date } = { status };
+    if (status === 'approved') {
+        updateData.approvedAt = new Date();
+    }
+
+    const booking = await Booking.findByIdAndUpdate(id, updateData, { new: true });
     return NextResponse.json({ success: true, booking });
 }

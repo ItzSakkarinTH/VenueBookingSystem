@@ -8,11 +8,14 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
-      # Add your environment variables here
-      # - MONGODB_URI=your_mongodb_connection_string
-      # - JWT_SECRET=your_jwt_secret
+      - NODE_ENV=${NODE_ENV:-production}
+      - MONGODB_URI=${MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+    env_file:
+      - .env
     restart: unless-stopped
+    
   # Optional: Add MongoDB if needed
   # mongodb:
   #   image: mongo:7
