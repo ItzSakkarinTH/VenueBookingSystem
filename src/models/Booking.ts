@@ -14,6 +14,7 @@ export interface IBooking extends Document {
     paymentDetails?: Record<string, unknown>; // Store OCR/QR data if needed
     productType?: string; // 'general' | 'food' | 'other'
     paymentDeadline?: Date; // For TTL auto-deletion
+    paymentGroupId?: string; // To group multiple locks in one transaction
     approvedAt?: Date; // When admin approved
     createdAt: Date;
     updatedAt: Date;
@@ -38,6 +39,7 @@ const BookingSchema = new Schema<IBooking>(
         paymentDetails: { type: Schema.Types.Mixed },
         productType: { type: String },
         paymentDeadline: { type: Date, index: { expires: 0 } }, // TTL Index
+        paymentGroupId: { type: String },
         approvedAt: { type: Date },
     },
     { timestamps: true }

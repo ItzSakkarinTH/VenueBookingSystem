@@ -44,24 +44,36 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         /* eslint-disable prefer-const */
-        let { lockId, lockIds, zone, date, amount, slipImage, paymentDetails, productType } = body;
+        let { lockId, lockIds, paymentGroupId, zone, date, amount, slipImage, paymentDetails, productType } = body;
+
+        // 1. If we have a paymentGroupId, identify the locks first
+        if (paymentGroupId && (!lockIds || lockIds.length === 0)) {
+            const groupBookings = await Booking.find({ paymentGroupId, userId: user.userId });
+            lockIds = groupBookings.map(b => b.lockId);
+            if (!date && groupBookings.length > 0) date = groupBookings[0].date;
+        }
 
         // Normalize to array
-        if (lockId && !lockIds) lockIds = [lockId];
+        if (lockId && (!lockIds || lockIds.length === 0)) lockIds = [lockId];
         if (!lockIds || !Array.isArray(lockIds) || lockIds.length === 0) {
             return NextResponse.json({ error: 'No locks specified' }, { status: 400 });
         }
 
         const amountPerLock = amount / lockIds.length;
 
-        // 1. Try to update existing 'awaiting_payment' bookings
+        // 2. Try to update existing 'awaiting_payment' bookings
+        const updateQuery: Record<string, unknown> = {
+            date,
+            lockId: { $in: lockIds },
+            userId: user.userId,
+            status: 'awaiting_payment'
+        };
+
+        // If we have a group ID, definitely include it in the query to be precise
+        if (paymentGroupId) updateQuery.paymentGroupId = paymentGroupId;
+
         const updateResult = await Booking.updateMany(
-            {
-                date,
-                lockId: { $in: lockIds },
-                userId: user.userId,
-                status: 'awaiting_payment'
-            },
+            updateQuery,
             {
                 $set: {
                     status: 'pending',
@@ -74,7 +86,7 @@ export async function POST(req: Request) {
             }
         );
 
-        // 2. If some were NOT updated (e.g. they didn't go through hold or it expired),
+        // 3. If some were NOT updated (e.g. they didn't go through hold or it expired),
         // we check which ones are missing and try to insert them.
         const updatedCount = updateResult.modifiedCount;
 
@@ -98,7 +110,8 @@ export async function POST(req: Request) {
                     paymentDetails,
                     productType,
                     status: 'pending',
-                    userId: user.userId
+                    userId: user.userId,
+                    paymentGroupId // Keep it in the group even if manually entered
                 }));
                 await Booking.insertMany(newBookingDocs);
             } else if (updatedCount === 0) {

@@ -54,6 +54,7 @@ export async function POST(req: Request) {
         const allLocks = GENERATE_LOCKS(dayType);
 
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+        const groupId = `GRP-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
         const bookingDocs = lockIds.map(id => {
             const lockDef = allLocks.find(l => l.id === id);
@@ -64,7 +65,8 @@ export async function POST(req: Request) {
                 userId,
                 status: 'awaiting_payment' as const,
                 amount: lockDef?.price || 43,
-                paymentDeadline: expiresAt
+                paymentDeadline: expiresAt,
+                paymentGroupId: groupId
             };
         });
 
