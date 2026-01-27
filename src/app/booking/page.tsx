@@ -59,6 +59,7 @@ export default function BookingPage() {
 
     // Steps: 1=Date, 2=Lock, 3=Info/Payment
     const [step, setStep] = useState(1);
+    const [mounted, setMounted] = useState(false);
 
     // Date Selection
     const [dates, setDates] = useState<ReturnType<typeof getUpcomingDates>>([]);
@@ -113,6 +114,7 @@ export default function BookingPage() {
 
     // Init
     useEffect(() => {
+        setMounted(true);
         setDates(getUpcomingDates());
 
         // Use 'name' or 'role' cookie to check login status
@@ -294,6 +296,10 @@ export default function BookingPage() {
             setLoading(false);
         }
     };
+
+    if (!mounted) {
+        return <div className="container" style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>กำลังโหลด...</div>;
+    }
 
     return (
         <div className="container" style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto' }}>

@@ -82,6 +82,7 @@ export default function MyBookingsPage() {
     const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<Booking | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [mounted, setMounted] = useState(false);
 
     // Custom Alert / Notification
     const [notification, setNotification] = useState<{
@@ -96,6 +97,7 @@ export default function MyBookingsPage() {
     };
 
     useEffect(() => {
+        setMounted(true);
         // Check login
         const nameCookie = getCookie('name');
         const roleCookie = getCookie('role');
@@ -166,6 +168,10 @@ export default function MyBookingsPage() {
         today.setHours(0, 0, 0, 0);
         return bookingDate < today || b.status === 'rejected';
     }));
+
+    if (!mounted) {
+        return <div className="container" style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>กำลังโหลด...</div>;
+    }
 
     return (
         <div className="container" style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto' }}>
