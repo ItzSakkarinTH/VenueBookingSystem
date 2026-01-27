@@ -8,11 +8,12 @@ export interface IBooking extends Document {
     lockId: string; // e.g. 'A1', 'B2'
     zone?: string; // e.g. 'A', 'B', 'C'
     date: string; // YYYY-MM-DD
-    status: 'pending' | 'approved' | 'rejected';
+    status: 'awaiting_payment' | 'pending' | 'approved' | 'rejected';
     amount: number;
     slipImage?: string;
     paymentDetails?: Record<string, unknown>; // Store OCR/QR data if needed
     productType?: string; // 'general' | 'food' | 'other'
+    paymentDeadline?: Date; // For TTL auto-deletion
     approvedAt?: Date; // When admin approved
     createdAt: Date;
     updatedAt: Date;
@@ -29,13 +30,14 @@ const BookingSchema = new Schema<IBooking>(
         date: { type: String, required: true }, // Format: YYYY-MM-DD
         status: {
             type: String,
-            enum: ['pending', 'approved', 'rejected'],
+            enum: ['awaiting_payment', 'pending', 'approved', 'rejected'],
             default: 'pending'
         },
         amount: { type: Number, required: true },
         slipImage: { type: String },
         paymentDetails: { type: Schema.Types.Mixed },
         productType: { type: String },
+        paymentDeadline: { type: Date, index: { expires: 0 } }, // TTL Index
         approvedAt: { type: Date },
     },
     { timestamps: true }

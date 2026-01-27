@@ -6,7 +6,9 @@ export async function GET() {
     await dbConnect();
     // Role check should be here
     // Populate user data including email and idCard for admin verification
-    const bookings = await Booking.find({}).populate('userId', 'name phone email idCard').sort({ createdAt: -1 });
+    const bookings = await Booking.find({ status: { $ne: 'awaiting_payment' } })
+        .populate('userId', 'name phone email idCard')
+        .sort({ createdAt: -1 });
     return NextResponse.json({ bookings });
 }
 

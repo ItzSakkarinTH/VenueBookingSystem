@@ -229,7 +229,7 @@ export default function BookingPage() {
             }
 
             // Success
-            setTimeLeft(1 * 60); // 1 minute
+            setTimeLeft(5 * 60); // 5 minutes
             setStep(3);
 
         } catch {

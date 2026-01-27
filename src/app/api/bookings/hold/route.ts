@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Booking from '@/models/Booking';
-import LockHold from '@/models/LockHold';
 import { getUserFromCookie } from '@/lib/auth';
+import { GENERATE_LOCKS } from '@/lib/constants';
 
 export async function POST(req: Request) {
     await dbConnect();
@@ -23,56 +23,52 @@ export async function POST(req: Request) {
 
         const userId = user.userId;
 
-        // 1. Check if any are already BOOKED (Permanent)
+        // 1. Check if any are already BOOKED or HELD by OTHERS
         const existingBookings = await Booking.find({
             date,
             lockId: { $in: lockIds },
-            status: { $ne: 'rejected' } // If rejected, it might be free, but let's be safe. Usually 'approved' or 'pending'
+            status: { $in: ['pending', 'approved', 'awaiting_payment'] }
         });
 
-        if (existingBookings.length > 0) {
-            const bookedIds = existingBookings.map(b => b.lockId);
+        const bookingsByOthers = existingBookings.filter(b => b.userId?.toString() !== userId);
+
+        if (bookingsByOthers.length > 0) {
+            const bookedIds = bookingsByOthers.map(b => b.lockId);
             return NextResponse.json({
-                error: 'บางรายการถูกจองไปแล้ว',
+                error: 'บางรายการถูกจองหรือกำลังมีคนทำรายการอยู่',
                 unavailable: bookedIds
             }, { status: 409 });
         }
 
-        // 2. Check if any are HELD by OTHERS
-        // We find valid holds that are NOT by this user
-        const existingHolds = await LockHold.find({
+        // 2. Clear existing awaiting_payment bookings by THIS user for these locks (to refresh)
+        await Booking.deleteMany({
             date,
             lockId: { $in: lockIds },
-            userId: { $ne: userId },
-            expiresAt: { $gt: new Date() } // active holds
+            userId: userId,
+            status: 'awaiting_payment'
         });
 
-        if (existingHolds.length > 0) {
-            const heldIds = existingHolds.map(h => h.lockId);
-            return NextResponse.json({
-                error: 'บางรายการกำลังถูกทำรายการโดยผู้อื่น',
-                unavailable: heldIds
-            }, { status: 409 });
-        }
+        // 3. Determine Price
+        const d = new Date(date);
+        const dayType = d.getDay() === 0 ? 'Sunday' : 'Saturday';
+        const allLocks = GENERATE_LOCKS(dayType);
 
-        // 3. Create or Refresh Holds
-        // We delete existing holds by THIS user for these locks (to refresh)
-        await LockHold.deleteMany({
-            date,
-            lockId: { $in: lockIds },
-            userId: userId
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+
+        const bookingDocs = lockIds.map(id => {
+            const lockDef = allLocks.find(l => l.id === id);
+            return {
+                lockId: id,
+                zone: lockDef?.zone || id.charAt(0),
+                date,
+                userId,
+                status: 'awaiting_payment' as const,
+                amount: lockDef?.price || 43,
+                paymentDeadline: expiresAt
+            };
         });
 
-        const expiresAt = new Date(Date.now() + 1 * 60 * 1000); // 1 minute from now
-
-        const holdDocs = lockIds.map(id => ({
-            lockId: id,
-            date,
-            userId,
-            expiresAt
-        }));
-
-        await LockHold.insertMany(holdDocs);
+        await Booking.insertMany(bookingDocs);
 
         return NextResponse.json({ success: true, expiresAt });
 
@@ -81,3 +77,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: (err as Error).message || 'Server error' }, { status: 500 });
     }
 }
+

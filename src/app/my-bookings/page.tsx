@@ -23,15 +23,22 @@ interface Booking {
     lockId: string;
     zone?: string;
     date: string;
-    status: 'pending' | 'approved' | 'rejected';
+    status: 'awaiting_payment' | 'pending' | 'approved' | 'rejected';
     amount: number;
     productType?: string;
     createdAt: string;
     approvedAt?: string;
     slipImage?: string;
+    paymentDeadline?: string;
 }
 
 const statusConfig = {
+    awaiting_payment: {
+        label: 'รอชำระเงิน',
+        color: '#e11d48',
+        bgColor: '#ffe4e6',
+        icon: Clock
+    },
     pending: {
         label: 'รอตรวจสอบ',
         color: '#f59e0b',
