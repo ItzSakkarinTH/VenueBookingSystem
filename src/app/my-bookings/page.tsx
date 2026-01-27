@@ -15,8 +15,12 @@ import {
     ChevronUp,
     Receipt,
     ArrowLeft,
-    Package
+    Package,
+    CreditCard,
+    X
 } from 'lucide-react';
+import SlipReaderIntegrated from '../components/SlipReader';
+import { SlipData } from '@/types';
 
 interface Booking {
     _id: string;
@@ -72,6 +76,9 @@ export default function MyBookingsPage() {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<Booking | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState('');
 
     useEffect(() => {
         // Check login
@@ -229,6 +236,7 @@ export default function MyBookingsPage() {
                                         onToggle={() => setExpandedId(expandedId === booking._id ? null : booking._id)}
                                         formatDate={formatDate}
                                         formatCreatedAt={formatCreatedAt}
+                                        onPay={(b) => setSelectedBookingForPayment(b)}
                                     />
                                 ))}
                             </div>
@@ -267,8 +275,164 @@ export default function MyBookingsPage() {
                     )}
                 </div>
             )}
+
+            {/* Payment Modal */}
+            {selectedBookingForPayment && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '1rem',
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '24px',
+                        width: '100%',
+                        maxWidth: '500px',
+                        maxHeight: '90vh',
+                        overflow: 'auto',
+                        position: 'relative',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                    }}>
+                        {/* Modal Header */}
+                        <div style={{
+                            padding: '1.5rem',
+                            borderBottom: '1px solid #f1f5f9',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            position: 'sticky',
+                            top: 0,
+                            background: 'white',
+                            zIndex: 10
+                        }}>
+                            <div>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b' }}>อัปโหลดหลักฐานการโอนเงิน</h3>
+                                <p style={{ fontSize: '0.875rem', color: '#64748b' }}>ล็อก {selectedBookingForPayment.lockId} • {formatDate(selectedBookingForPayment.date)}</p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedBookingForPayment(null)}
+                                style={{
+                                    background: '#f1f5f9',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    width: '36px',
+                                    height: '36px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    color: '#64748b'
+                                }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div style={{ padding: '1.5rem' }}>
+                            {error && (
+                                <div style={{
+                                    padding: '1rem',
+                                    background: '#fef2f2',
+                                    color: '#b91c1c',
+                                    borderRadius: '12px',
+                                    marginBottom: '1.5rem',
+                                    fontSize: '0.9rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                }}>
+                                    <AlertCircle size={18} />
+                                    {error}
+                                </div>
+                            )}
+
+                            <SlipReaderIntegrated
+                                expectedAmount={selectedBookingForPayment.amount}
+                                onSlipVerified={async (slipData: SlipData) => {
+                                    setIsSubmitting(true);
+                                    setError('');
+                                    try {
+                                        const res = await fetch('/api/bookings', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                lockIds: [selectedBookingForPayment.lockId],
+                                                date: selectedBookingForPayment.date,
+                                                amount: selectedBookingForPayment.amount,
+                                                slipImage: slipData.slipImage,
+                                                paymentDetails: { ...slipData.qrData, ...slipData.ocrData },
+                                                productType: selectedBookingForPayment.productType || 'general'
+                                            })
+                                        });
+                                        const data = await res.json();
+                                        if (!res.ok) throw new Error(data.error || 'Failed to update booking');
+
+                                        // Success - Refresh list and close modal
+                                        setSelectedBookingForPayment(null);
+                                        // Simple way to refresh: refetch
+                                        fetch('/api/user/bookings')
+                                            .then(r => r.json())
+                                            .then(d => d.bookings && setBookings(d.bookings));
+
+                                        alert('แจ้งชำระเงินสำเร็จแล้ว! ระบบกำลังดำเนินการตรวจสอบ');
+                                    } catch (err) {
+                                        setError((err as Error).message);
+                                    } finally {
+                                        setIsSubmitting(false);
+                                    }
+                                }}
+                                onError={(msg) => setError(msg)}
+                            />
+
+                            {isSubmitting && (
+                                <div style={{
+                                    marginTop: '1rem',
+                                    textAlign: 'center',
+                                    color: 'var(--primary-orange)',
+                                    fontWeight: 'bold'
+                                }}>
+                                    กำลังบันทึกข้อมูล...
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
+}
+
+// Countdown hook for the card
+function useCountdown(targetDate?: string) {
+    const [timeLeft, setTimeLeft] = useState<number>(0);
+
+    useEffect(() => {
+        if (!targetDate) return;
+
+        const calculate = () => {
+            const now = new Date().getTime();
+            const deadline = new Date(targetDate).getTime();
+            const diff = Math.max(0, Math.floor((deadline - now) / 1000));
+            setTimeLeft(diff);
+            return diff;
+        };
+
+        calculate();
+        const timer = setInterval(() => {
+            const left = calculate();
+            if (left <= 0) clearInterval(timer);
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [targetDate]);
+
+    return timeLeft;
 }
 
 // Booking Card Component
@@ -278,7 +442,8 @@ function BookingCard({
     onToggle,
     formatDate,
     formatCreatedAt,
-    isPast = false
+    isPast = false,
+    onPay
 }: {
     booking: Booking;
     isExpanded: boolean;
@@ -286,9 +451,11 @@ function BookingCard({
     formatDate: (date: string) => string;
     formatCreatedAt: (date: string) => string;
     isPast?: boolean;
+    onPay?: (b: Booking) => void;
 }) {
     const status = statusConfig[booking.status];
     const StatusIcon = status.icon;
+    const timeLeft = useCountdown(booking.paymentDeadline);
 
     return (
         <div
@@ -401,6 +568,61 @@ function BookingCard({
                     )}
 
                     {/* Status Message */}
+                    {booking.status === 'awaiting_payment' && (
+                        <div style={{ marginTop: '1rem' }}>
+                            <div style={{
+                                padding: '1rem',
+                                background: '#fff1f2',
+                                borderRadius: '12px',
+                                border: '1px solid #fecdd3',
+                                color: '#be123c',
+                                marginBottom: '1rem'
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                    <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Clock size={18} />
+                                        กรุณาชำระเงินและอัปโหลดสลิป
+                                    </div>
+                                    <div style={{
+                                        background: '#be123c', color: 'white',
+                                        padding: '0.25rem 0.75rem', borderRadius: '20px',
+                                        fontSize: '0.85rem', fontWeight: 'bold'
+                                    }}>
+                                        เหลือเวลา: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                                    </div>
+                                </div>
+                                <p style={{ fontSize: '0.85rem', color: '#be123c', opacity: 0.8, marginBottom: '1rem' }}>
+                                    กรุณาโอนเงินจำนวน <strong>{booking.amount} บาท</strong> และแนบหลักฐานการโอนเงินภายในเวลาที่กำหนด หากเกินกำหนดรายการจองนี้จะถูกยกเลิกโดยอัตโนมัติ
+                                </p>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onPay?.(booking);
+                                    }}
+                                    disabled={timeLeft <= 0}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        background: timeLeft <= 0 ? '#fda4af' : '#e11d48',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '10px',
+                                        fontWeight: 'bold',
+                                        cursor: timeLeft <= 0 ? 'not-allowed' : 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '0.5rem',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    <CreditCard size={18} />
+                                    {timeLeft <= 0 ? 'รายการหมดเวลาแล้ว' : 'แจ้งชำระเงิน (อัปโหลดสลิป)'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {booking.status === 'pending' && (
                         <div style={{
                             marginTop: '1rem',
