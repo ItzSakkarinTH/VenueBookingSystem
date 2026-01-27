@@ -6,7 +6,7 @@ import { GENERATE_LOCKS, ZONES } from '@/lib/constants';
 import SlipReaderIntegrated from '../components/SlipReader';
 import { SlipData } from '@/types';
 import { getCookie } from 'cookies-next';
-import { Calendar, MapPin, User, CheckCircle, ChevronLeft, CreditCard, Info } from 'lucide-react';
+import { Calendar, MapPin, User, CheckCircle, ChevronLeft, CreditCard, Info, Bell, X } from 'lucide-react';
 import Link from 'next/link';
 
 // Helper to generate dates
@@ -99,6 +99,18 @@ export default function BookingPage() {
     // View booked lock details
     const [viewBookedLock, setViewBookedLock] = useState<BookingInfo | null>(null);
 
+    // Custom Alert / Notification
+    const [notification, setNotification] = useState<{
+        show: boolean;
+        title: string;
+        message: string;
+        type: 'success' | 'info' | 'error';
+    }>({ show: false, title: '', message: '', type: 'info' });
+
+    const showAlert = (title: string, message: string, type: 'success' | 'info' | 'error' = 'info') => {
+        setNotification({ show: true, title, message, type });
+    };
+
     // Init
     useEffect(() => {
         setDates(getUpcomingDates());
@@ -169,7 +181,7 @@ export default function BookingPage() {
             setTimeLeft(prev => {
                 if (prev <= 1) {
                     clearInterval(timer);
-                    alert('หมดเวลาทำรายการ กรุณาทำรายการใหม่');
+                    showAlert('หมดเวลา!', 'หมดเวลาทำรายการจอง กรุณาเลือกล็อกใหม่ครับ', 'error');
                     setStep(2);
                     setSelectedLocks([]);
                     return 0;
@@ -197,18 +209,12 @@ export default function BookingPage() {
     };
 
     const handleConfirmSelection = async () => {
-        if (selectedLocks.length === 0) return;
-
         if (!isLoggedIn) {
-            alert('กรุณาเข้าสู่ระบบก่อนทำการจอง');
-            // Optionally redirect or show login modal
-            // For now we just alert, forcing user to login via header/menu if available or go to Step 3 logic?
-            // Actually, Step 3 has a login prompt.
-            // If we block entry to Step 3, they can't see the login prompt!
-            // So we must allow entry to Step 3 BUT maybe skip the HOLD CHECK?
-            // NO, if we skip hold, we risk race condition.
-            // We should redirect to login page.
-            window.location.href = '/login';
+            showAlert('เข้าสู่ระบบ', 'กรุณาเข้าสู่ระบบก่อนทำการจองพื้นที่ครับ', 'info');
+            // Optionally redirect after a short delay
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 2000);
             return;
         }
 
@@ -224,11 +230,12 @@ export default function BookingPage() {
             });
             const data = await res.json();
             if (!res.ok) {
-                alert(data.error || 'ไม่สามารถจองได้ในขณะนี้');
+                showAlert('ขออภัย', data.error || 'ไม่สามารถจองได้ในขณะนี้', 'error');
                 return;
             }
 
             // Success
+            showAlert('จองสำเร็จ! 🔒', 'ระบบได้ล็อกพื้นที่ให้คุณแล้วเป็นเวลา 5 นาที กรุณาโอนเงินและอัปโหลดสลิปเพื่อยืนยันการจองครับ', 'success');
             setTimeLeft(5 * 60); // 5 minutes
             setStep(3);
 
@@ -275,6 +282,7 @@ export default function BookingPage() {
             if (!res.ok) throw new Error(data.error || 'Booking failed');
 
             // Show receipt instead of redirect
+            showAlert('การชำระเงินสำเร็จ ✅', 'แจ้งชำระเงินเรียบร้อยแล้ว! แอดมินจะรีบตรวจสอบข้อมูลให้เร็วที่สุดครับ', 'success');
             setBookingId(data.bookings?.[0]?._id || data.bookingId || 'BK' + Date.now());
             setBookingConfirmed(true);
             setStep(4); // Step 4 = Receipt
@@ -1206,6 +1214,90 @@ export default function BookingPage() {
                     </div>
                 </div>
             )}
+            {/* Notification Modal */}
+            {notification.show && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 2000, padding: '1rem',
+                    animation: 'fadeIn 0.3s ease-out'
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '24px',
+                        width: '100%', maxWidth: '400px',
+                        padding: '2rem',
+                        textAlign: 'center',
+                        position: 'relative',
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                        animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}>
+                        <button
+                            onClick={() => setNotification({ ...notification, show: false })}
+                            style={{
+                                position: 'absolute', top: '1rem', right: '1rem',
+                                background: '#f1f5f9', border: 'none', borderRadius: '50%',
+                                width: '32px', height: '32px', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#64748b'
+                            }}
+                        >
+                            <X size={18} />
+                        </button>
+
+                        <div style={{
+                            width: '72px', height: '72px',
+                            backgroundColor: notification.type === 'success' ? '#dcfce7' : notification.type === 'error' ? '#fee2e2' : '#e0f2fe',
+                            borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            margin: '0 auto 1.5rem auto',
+                            color: notification.type === 'success' ? '#22c55e' : notification.type === 'error' ? '#ef4444' : '#0ea5e9'
+                        }}>
+                            {notification.type === 'success' ? <CheckCircle size={40} /> : notification.type === 'error' ? <Bell size={40} /> : <Info size={40} />}
+                        </div>
+
+                        <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.75rem' }}>
+                            {notification.title}
+                        </h3>
+                        <p style={{ color: '#64748b', fontSize: '1rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+                            {notification.message}
+                        </p>
+
+                        <button
+                            onClick={() => setNotification({ ...notification, show: false })}
+                            style={{
+                                width: '100%',
+                                padding: '1rem',
+                                backgroundColor: notification.type === 'success' ? '#22c55e' : notification.type === 'error' ? '#ef4444' : '#0ea5e9',
+                                color: 'white',
+                                borderRadius: '12px',
+                                border: 'none',
+                                fontWeight: 'bold',
+                                fontSize: '1.1rem',
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s',
+                                boxShadow: `0 10px 15px -3px ${notification.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : notification.type === 'error' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(14, 165, 233, 0.3)'}`
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                            ตกลง
+                        </button>
+                    </div>
+                </div>
+            )}
+            <style jsx global>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+            `}</style>
         </div >
     );
 }
