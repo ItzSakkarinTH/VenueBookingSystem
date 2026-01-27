@@ -8,24 +8,25 @@ import { getCookie } from 'cookies-next';
 
 export default function HomePage() {
   const [showAnnouncement, setShowAnnouncement] = useState(false);
-  // Check login status from cookies using lazy initializer
-  const [isLoggedIn] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const nameCookie = getCookie('name');
-      const roleCookie = getCookie('role');
-      return !!(nameCookie || roleCookie);
-    }
-    return false;
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
+
   interface Announcement {
     title: string;
     content: string;
     image?: string;
     active: boolean;
   }
-  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
 
   useEffect(() => {
+    // 1. Check login status
+    const loggedIn = !!(getCookie('name') || getCookie('role'));
+    // Use setTimeout to avoid synchronous setState lint error and satisfy hydration
+    setTimeout(() => {
+      setIsLoggedIn(loggedIn);
+    }, 0);
+
+    // 2. Fetch announcement
     fetch('/api/admin/announcements/latest')
       .then(res => res.json())
       .then(data => {

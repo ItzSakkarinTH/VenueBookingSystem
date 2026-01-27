@@ -13,9 +13,23 @@ export async function GET(req: Request) {
     // Include booker info for display - populate userId to get name
     const bookings = await Booking.find({ date })
         .populate('userId', 'name phone')
-        .select('lockId userId guestName guestPhone status');
+        .select('lockId userId guestName guestPhone status')
+        .lean();
 
-    return NextResponse.json({ bookings });
+    // Mapping for frontend - map 'awaiting_payment' to 'holding' status
+    const transformedBookings = bookings.map(b => {
+        if (b.status === 'awaiting_payment') {
+            return {
+                ...b,
+                status: 'holding',
+                guestName: 'กำลังทำรายการ',
+                isHold: true
+            };
+        }
+        return b;
+    });
+
+    return NextResponse.json({ bookings: transformedBookings });
 }
 
 export async function POST(req: Request) {
@@ -29,29 +43,96 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        const { lockId, zone, date, amount, slipImage, paymentDetails, productType } = body;
+        /* eslint-disable prefer-const */
+        let { lockId, lockIds, paymentGroupId, zone, date, amount, slipImage, paymentDetails, productType } = body;
 
-        const bookingData = {
-            lockId,
-            zone, // Store zone information
+        // 1. If we have a paymentGroupId, identify the locks first
+        if (paymentGroupId && (!lockIds || lockIds.length === 0)) {
+            const groupBookings = await Booking.find({ paymentGroupId, userId: user.userId });
+            lockIds = groupBookings.map(b => b.lockId);
+            if (!date && groupBookings.length > 0) date = groupBookings[0].date;
+        }
+
+        // Normalize to array
+        if (lockId && (!lockIds || lockIds.length === 0)) lockIds = [lockId];
+        if (!lockIds || !Array.isArray(lockIds) || lockIds.length === 0) {
+            return NextResponse.json({ error: 'No locks specified' }, { status: 400 });
+        }
+
+        const amountPerLock = amount / lockIds.length;
+
+        // 2. Try to update existing 'awaiting_payment' bookings
+        const updateQuery: Record<string, unknown> = {
             date,
-            amount,
-            slipImage,
-            paymentDetails,
-            productType,
-            status: 'pending',
-            userId: user.userId
+            lockId: { $in: lockIds },
+            userId: user.userId,
+            status: 'awaiting_payment'
         };
 
-        // Create Booking
-        // The Unique Index on (lockId, date) will prevent duplicates/race conditions
-        const booking = await Booking.create(bookingData);
+        // If we have a group ID, definitely include it in the query to be precise
+        if (paymentGroupId) updateQuery.paymentGroupId = paymentGroupId;
 
-        return NextResponse.json({ success: true, booking });
+        const updateResult = await Booking.updateMany(
+            updateQuery,
+            {
+                $set: {
+                    status: 'pending',
+                    slipImage,
+                    paymentDetails,
+                    productType,
+                    amount: amountPerLock
+                },
+                $unset: { paymentDeadline: 1 }
+            }
+        );
+
+        // 3. If some were NOT updated (e.g. they didn't go through hold or it expired),
+        // we check which ones are missing and try to insert them.
+        const updatedCount = updateResult.modifiedCount;
+
+        if (updatedCount < lockIds.length) {
+            // Find which ones were NOT updated
+            const existingInDb = await Booking.find({
+                date,
+                lockId: { $in: lockIds },
+                status: { $in: ['pending', 'approved', 'awaiting_payment'] }
+            });
+            const existingLockIds = new Set(existingInDb.map(b => b.lockId));
+            const missingLockIds = lockIds.filter(id => !existingLockIds.has(id));
+
+            if (missingLockIds.length > 0) {
+                const newBookingDocs = missingLockIds.map((id: string) => ({
+                    lockId: id,
+                    zone,
+                    date,
+                    amount: amountPerLock,
+                    slipImage,
+                    paymentDetails,
+                    productType,
+                    status: 'pending',
+                    userId: user.userId,
+                    paymentGroupId // Keep it in the group even if manually entered
+                }));
+                await Booking.insertMany(newBookingDocs);
+            } else if (updatedCount === 0) {
+                // Nothing updated and nothing missing to insert? Means they were taken by others
+                return NextResponse.json({ error: 'บางรายการถูกจองไปแล้วโดยผู้อื่น' }, { status: 409 });
+            }
+        }
+
+        // Fetch all relevant bookings to return
+        const finalBookings = await Booking.find({
+            date,
+            lockId: { $in: lockIds },
+            userId: user.userId
+        });
+
+        return NextResponse.json({ success: true, bookings: finalBookings });
     } catch (err: unknown) {
         if ((err as { code?: number }).code === 11000) {
-            return NextResponse.json({ error: 'This lock is already booked by someone else.' }, { status: 409 });
+            return NextResponse.json({ error: 'บางรายการถูกจองไปแล้ว (Duplicate)' }, { status: 409 });
         }
         return NextResponse.json({ error: (err as Error).message || 'An error occurred' }, { status: 500 });
     }
 }
+

@@ -6,7 +6,7 @@ import { GENERATE_LOCKS, ZONES } from '@/lib/constants';
 import SlipReaderIntegrated from '../components/SlipReader';
 import { SlipData } from '@/types';
 import { getCookie } from 'cookies-next';
-import { Calendar, MapPin, User, CheckCircle, ChevronLeft, CreditCard, Info } from 'lucide-react';
+import { Calendar, MapPin, User, CheckCircle, ChevronLeft, CreditCard, Info, Bell, X } from 'lucide-react';
 import Link from 'next/link';
 
 // Helper to generate dates
@@ -59,6 +59,7 @@ export default function BookingPage() {
 
     // Steps: 1=Date, 2=Lock, 3=Info/Payment
     const [step, setStep] = useState(1);
+    const [mounted, setMounted] = useState(false);
 
     // Date Selection
     const [dates, setDates] = useState<ReturnType<typeof getUpcomingDates>>([]);
@@ -81,7 +82,8 @@ export default function BookingPage() {
     // Lock Selection
     const [occupiedLocks, setOccupiedLocks] = useState<string[]>([]);
     const [bookingsInfo, setBookingsInfo] = useState<BookingInfo[]>([]);
-    const [selectedLock, setSelectedLock] = useState<LockDef | null>(null);
+    const [selectedLocks, setSelectedLocks] = useState<LockDef[]>([]);
+    const [timeLeft, setTimeLeft] = useState(0);
     const [locks, setLocks] = useState<LockDef[]>([]);
 
     // User Info
@@ -98,8 +100,21 @@ export default function BookingPage() {
     // View booked lock details
     const [viewBookedLock, setViewBookedLock] = useState<BookingInfo | null>(null);
 
+    // Custom Alert / Notification
+    const [notification, setNotification] = useState<{
+        show: boolean;
+        title: string;
+        message: string;
+        type: 'success' | 'info' | 'error';
+    }>({ show: false, title: '', message: '', type: 'info' });
+
+    const showAlert = (title: string, message: string, type: 'success' | 'info' | 'error' = 'info') => {
+        setNotification({ show: true, title, message, type });
+    };
+
     // Init
     useEffect(() => {
+        setMounted(true);
         setDates(getUpcomingDates());
 
         // Use 'name' or 'role' cookie to check login status
@@ -161,25 +176,83 @@ export default function BookingPage() {
 
     }, [selectedDateInfo]);
 
+    // Timer Effect
+    useEffect(() => {
+        if (timeLeft <= 0) return;
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    showAlert('หมดเวลา!', 'หมดเวลาทำรายการจอง กรุณาเลือกล็อกใหม่ครับ', 'error');
+                    setStep(2);
+                    setSelectedLocks([]);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [timeLeft]);
+
     const handleDateSelect = (d: typeof dates[0]) => {
         setSelectedDateInfo(d);
-        // Auto advance to step 2 logic? Maybe wait for user click "Next" or just go.
-        // Let's go to step 2 automatically for smoother flow
         setStep(2);
-        setSelectedLock(null); // Reset lock
+        setSelectedLocks([]);
     };
 
     const handleLockClick = (lock: LockDef) => {
         if (occupiedLocks.includes(lock.id)) return;
-        setSelectedLock(lock);
-        setStep(3); // Go to payment
+
+        setSelectedLocks(prev => {
+            const exists = prev.find(l => l.id === lock.id);
+            if (exists) return prev.filter(l => l.id !== lock.id);
+            return [...prev, lock];
+        });
+    };
+
+    const handleConfirmSelection = async () => {
+        if (!isLoggedIn) {
+            showAlert('เข้าสู่ระบบ', 'กรุณาเข้าสู่ระบบก่อนทำการจองพื้นที่ครับ', 'info');
+            // Optionally redirect after a short delay
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 2000);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await fetch('/api/bookings/hold', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    lockIds: selectedLocks.map(l => l.id),
+                    date: selectedDateInfo?.date
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                showAlert('ขออภัย', data.error || 'ไม่สามารถจองได้ในขณะนี้', 'error');
+                return;
+            }
+
+            // Success
+            showAlert('จองสำเร็จ! 🔒', 'ระบบได้ล็อกพื้นที่ให้คุณแล้วเป็นเวลา 5 นาที กรุณาโอนเงินและอัปโหลดสลิปเพื่อยืนยันการจองครับ', 'success');
+            setTimeLeft(5 * 60); // 5 minutes
+            setStep(3);
+
+        } catch {
+            alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSlipVerified = async (slipData: SlipData) => {
         setLoading(true);
         setError('');
 
-        if (!selectedDateInfo || !selectedLock) return;
+        if (!selectedDateInfo || selectedLocks.length === 0) return;
 
         // Require login
         if (!isLoggedIn) {
@@ -189,11 +262,13 @@ export default function BookingPage() {
         }
 
         try {
+            const totalAmount = selectedLocks.reduce((sum, l) => sum + l.price, 0);
+
             const payload = {
-                lockId: selectedLock.id,
-                zone: selectedLock.zone, // Add zone to booking
+                lockIds: selectedLocks.map(l => l.id),
+                zone: selectedLocks[0]?.zone,
                 date: selectedDateInfo.date,
-                amount: selectedLock.price,
+                amount: totalAmount,
                 slipImage: slipData.slipImage,
                 paymentDetails: { ...slipData.qrData, ...slipData.ocrData },
                 productType: productType
@@ -209,9 +284,11 @@ export default function BookingPage() {
             if (!res.ok) throw new Error(data.error || 'Booking failed');
 
             // Show receipt instead of redirect
-            setBookingId(data.booking?._id || data.bookingId || 'BK' + Date.now());
+            showAlert('การชำระเงินสำเร็จ ✅', 'แจ้งชำระเงินเรียบร้อยแล้ว! แอดมินจะรีบตรวจสอบข้อมูลให้เร็วที่สุดครับ', 'success');
+            setBookingId(data.bookings?.[0]?._id || data.bookingId || 'BK' + Date.now());
             setBookingConfirmed(true);
             setStep(4); // Step 4 = Receipt
+            setTimeLeft(0); // Stop timer
 
         } catch (err: unknown) {
             setError((err as Error).message || 'An error occurred');
@@ -219,6 +296,10 @@ export default function BookingPage() {
             setLoading(false);
         }
     };
+
+    if (!mounted) {
+        return <div className="container" style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>กำลังโหลด...</div>;
+    }
 
     return (
         <div className="container" style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto' }}>
@@ -527,6 +608,7 @@ export default function BookingPage() {
                                                 }}>
                                                     {groupLocks.map(lock => {
                                                         const isBooked = occupiedLocks.includes(lock.id);
+                                                        const isSelected = selectedLocks.some(l => l.id === lock.id);
                                                         const zone = ZONES.find(z => z.id === lock.zone);
                                                         const bookingInfo = bookingsInfo.find(b => b.lockId === lock.id);
 
@@ -546,8 +628,8 @@ export default function BookingPage() {
                                                                     width: '55px',
                                                                     height: '55px',
                                                                     borderRadius: '8px',
-                                                                    border: `2px solid ${isBooked ? '#f59e0b' : zone?.color}`,
-                                                                    background: isBooked ? '#fef3c7' : 'white',
+                                                                    border: `2px solid ${isBooked ? '#f59e0b' : isSelected ? 'var(--primary-orange)' : zone?.color}`,
+                                                                    background: isBooked ? '#fef3c7' : isSelected ? 'var(--orange-light)' : 'white',
                                                                     display: 'flex',
                                                                     flexDirection: 'column',
                                                                     alignItems: 'center',
@@ -555,27 +637,27 @@ export default function BookingPage() {
                                                                     cursor: 'pointer',
                                                                     opacity: 1,
                                                                     transition: 'all 0.2s',
-                                                                    transform: 'scale(1)',
+                                                                    transform: isSelected ? 'scale(0.95)' : 'scale(1)',
                                                                     position: 'relative'
                                                                 }}
-                                                                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
-                                                                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                                                                onMouseEnter={(e) => (e.currentTarget.style.transform = isSelected ? 'scale(0.95)' : 'scale(1.05)')}
+                                                                onMouseLeave={(e) => (e.currentTarget.style.transform = isSelected ? 'scale(0.95)' : 'scale(1)')}
                                                                 title={isBooked ? `จองโดย: ${bookingInfo?.bookerName || 'ไม่ระบุ'}` : 'ว่าง - คลิกเพื่อจอง'}
                                                             >
                                                                 <div style={{
                                                                     fontWeight: 'bold',
                                                                     fontSize: '0.9rem',
-                                                                    color: isBooked ? '#b45309' : zone?.color
+                                                                    color: isBooked ? '#b45309' : isSelected ? 'var(--primary-orange)' : zone?.color
                                                                 }}>
                                                                     {lock.id}
                                                                 </div>
                                                                 <div style={{
                                                                     fontSize: '0.6rem',
-                                                                    color: isBooked ? '#b45309' : '#64748b',
+                                                                    color: isBooked ? '#b45309' : isSelected ? 'var(--primary-orange)' : '#64748b',
                                                                     textAlign: 'center',
                                                                     lineHeight: 1.1
                                                                 }}>
-                                                                    {isBooked ? '🔒 ดูผู้จอง' : `${lock.price}฿`}
+                                                                    {isBooked ? '🔒 ดู' : `${lock.price}฿`}
                                                                 </div>
                                                             </div>
                                                         );
@@ -615,7 +697,51 @@ export default function BookingPage() {
                                         }} />
                                         <span>จองแล้ว (คลิกดูผู้จอง)</span>
                                     </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <div style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            background: 'var(--orange-light)',
+                                            border: '2px solid var(--primary-orange)',
+                                            borderRadius: '4px'
+                                        }} />
+                                        <span>ที่เลือก</span>
+                                    </div>
                                 </div>
+
+                                {selectedLocks.length > 0 && (
+                                    <div style={{
+                                        position: 'fixed',
+                                        bottom: '20px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        zIndex: 100,
+                                        width: '90%',
+                                        maxWidth: '400px'
+                                    }}>
+                                        <button
+                                            onClick={handleConfirmSelection}
+                                            style={{
+                                                width: '100%',
+                                                padding: '1rem',
+                                                background: 'var(--primary-orange)',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '50px',
+                                                fontWeight: 'bold',
+                                                fontSize: '1.1rem',
+                                                boxShadow: '0 4px 20px rgba(249, 115, 22, 0.4)',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '0.5rem'
+                                            }}
+                                        >
+                                            ยืนยัน {selectedLocks.length} รายการ <ChevronLeft style={{ transform: 'rotate(180deg)' }} />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             /* Prompt to select a zone */
@@ -639,11 +765,22 @@ export default function BookingPage() {
                 )}
 
                 {/* Step 3: Information & Payment */}
-                {step === 3 && selectedLock && (
+                {step === 3 && selectedLocks.length > 0 && (
                     <div>
-                        <h2 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <CreditCard size={20} color="var(--primary-orange)" /> ยืนยันข้อมูลและชำระเงิน
-                        </h2>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                                <CreditCard size={20} color="var(--primary-orange)" /> ยืนยันข้อมูลและชำระเงิน
+                            </h2>
+                            {timeLeft > 0 && (
+                                <div style={{
+                                    background: '#ffe4e6', color: '#e11d48',
+                                    padding: '0.5rem 1rem', borderRadius: '20px',
+                                    fontSize: '0.9rem', fontWeight: 'bold'
+                                }}>
+                                    ⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                                </div>
+                            )}
+                        </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', flexWrap: 'wrap' }} className="responsive-grid">
 
@@ -654,18 +791,18 @@ export default function BookingPage() {
                                     <span>วันที่:</span>
                                     <strong>{selectedDateInfo?.dayName} {selectedDateInfo?.label}</strong>
                                 </div>
-                                <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                                <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <span>ตำแหน่ง:</span>
-                                    <strong>Lock {selectedLock.id}</strong>
-                                </div>
-                                <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>โซน:</span>
-                                    <strong>{selectedLock.zone}</strong>
+                                    <div style={{ textAlign: 'right' }}>
+                                        {selectedLocks.map(l => (
+                                            <div key={l.id}><strong>{l.id}</strong> ({l.zone})</div>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div style={{ borderTop: '1px solid #e2e8f0', margin: '1rem 0' }}></div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', color: 'var(--primary-orange)', fontWeight: 'bold' }}>
                                     <span>ยอดชำระ:</span>
-                                    <span>{selectedLock.price} บาท</span>
+                                    <span>{selectedLocks.reduce((s, l) => s + l.price, 0)} บาท</span>
                                 </div>
 
                                 {/* Bank Account Info */}
@@ -817,7 +954,7 @@ export default function BookingPage() {
                                             <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>ชำระเงิน</h3>
                                             {error && <div style={{ color: 'var(--error)', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</div>}
                                             <SlipReaderIntegrated
-                                                expectedAmount={selectedLock.price}
+                                                expectedAmount={selectedLocks.reduce((s, l) => s + l.price, 0)}
                                                 onSlipVerified={handleSlipVerified}
                                                 onError={(msg) => setError(msg)}
                                             />
@@ -830,7 +967,7 @@ export default function BookingPage() {
                 )}
 
                 {/* Step 4: Receipt / Confirmation */}
-                {step === 4 && bookingConfirmed && selectedLock && selectedDateInfo && (
+                {step === 4 && bookingConfirmed && selectedLocks.length > 0 && selectedDateInfo && (
                     <div style={{ textAlign: 'center' }}>
                         {/* Success Animation */}
                         <div style={{
@@ -905,13 +1042,13 @@ export default function BookingPage() {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px dashed #e2e8f0' }}>
                                         <span style={{ color: '#64748b' }}>ล็อก</span>
                                         <span style={{ fontWeight: '700', color: '#e84a0e', fontSize: '1.1rem' }}>
-                                            {selectedLock.id}
+                                            {selectedLocks.map(l => l.id).join(', ')}
                                         </span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px dashed #e2e8f0' }}>
                                         <span style={{ color: '#64748b' }}>โซน</span>
                                         <span style={{ fontWeight: '600', color: '#1e293b' }}>
-                                            {ZONES.find(z => z.id === selectedLock.zone)?.name || selectedLock.zone}
+                                            {selectedLocks[0]?.zone} (รวม)
                                         </span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px dashed #e2e8f0' }}>
@@ -929,7 +1066,7 @@ export default function BookingPage() {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem' }}>
                                         <span style={{ fontWeight: '600', color: '#1e293b' }}>ยอดชำระ</span>
                                         <span style={{ fontWeight: 'bold', color: '#e84a0e', fontSize: '1.25rem' }}>
-                                            {selectedLock.price} บาท
+                                            {selectedLocks.reduce((s, l) => s + l.price, 0)} บาท
                                         </span>
                                     </div>
                                 </div>
@@ -1083,6 +1220,90 @@ export default function BookingPage() {
                     </div>
                 </div>
             )}
+            {/* Notification Modal */}
+            {notification.show && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 2000, padding: '1rem',
+                    animation: 'fadeIn 0.3s ease-out'
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '24px',
+                        width: '100%', maxWidth: '400px',
+                        padding: '2rem',
+                        textAlign: 'center',
+                        position: 'relative',
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                        animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}>
+                        <button
+                            onClick={() => setNotification({ ...notification, show: false })}
+                            style={{
+                                position: 'absolute', top: '1rem', right: '1rem',
+                                background: '#f1f5f9', border: 'none', borderRadius: '50%',
+                                width: '32px', height: '32px', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#64748b'
+                            }}
+                        >
+                            <X size={18} />
+                        </button>
+
+                        <div style={{
+                            width: '72px', height: '72px',
+                            backgroundColor: notification.type === 'success' ? '#dcfce7' : notification.type === 'error' ? '#fee2e2' : '#e0f2fe',
+                            borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            margin: '0 auto 1.5rem auto',
+                            color: notification.type === 'success' ? '#22c55e' : notification.type === 'error' ? '#ef4444' : '#0ea5e9'
+                        }}>
+                            {notification.type === 'success' ? <CheckCircle size={40} /> : notification.type === 'error' ? <Bell size={40} /> : <Info size={40} />}
+                        </div>
+
+                        <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.75rem' }}>
+                            {notification.title}
+                        </h3>
+                        <p style={{ color: '#64748b', fontSize: '1rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+                            {notification.message}
+                        </p>
+
+                        <button
+                            onClick={() => setNotification({ ...notification, show: false })}
+                            style={{
+                                width: '100%',
+                                padding: '1rem',
+                                backgroundColor: notification.type === 'success' ? '#22c55e' : notification.type === 'error' ? '#ef4444' : '#0ea5e9',
+                                color: 'white',
+                                borderRadius: '12px',
+                                border: 'none',
+                                fontWeight: 'bold',
+                                fontSize: '1.1rem',
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s',
+                                boxShadow: `0 10px 15px -3px ${notification.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : notification.type === 'error' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(14, 165, 233, 0.3)'}`
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                            ตกลง
+                        </button>
+                    </div>
+                </div>
+            )}
+            <style jsx global>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+            `}</style>
         </div >
     );
 }
