@@ -5,6 +5,8 @@ export interface ILockQueue extends Document {
     date: string;
     userId: string;
     expiresAt: Date;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 const LockQueueSchema = new Schema<ILockQueue>(

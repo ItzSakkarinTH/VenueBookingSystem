@@ -80,12 +80,19 @@ export default function BookingPage() {
         queueCount?: number;
     }
 
+    interface UserQueue {
+        lockId: string;
+        position: number;
+        expiresAt: string;
+    }
+
     // Lock Selection
     const [occupiedLocks, setOccupiedLocks] = useState<string[]>([]);
     const [bookingsInfo, setBookingsInfo] = useState<BookingInfo[]>([]);
     const [selectedLocks, setSelectedLocks] = useState<LockDef[]>([]);
     const [timeLeft, setTimeLeft] = useState(0);
     const [locks, setLocks] = useState<LockDef[]>([]);
+    const [userQueues, setUserQueues] = useState<UserQueue[]>([]);
 
     // User Info
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -173,6 +180,9 @@ export default function BookingPage() {
                     }));
                     setBookingsInfo(infos);
                 }
+                if (data.userQueues) {
+                    setUserQueues(data.userQueues);
+                }
             })
             .catch(err => console.error(err))
             .finally(() => setLoading(false));
@@ -181,21 +191,25 @@ export default function BookingPage() {
 
     // Timer Effect
     useEffect(() => {
-        if (timeLeft <= 0) return;
+        if (timeLeft <= 0 && userQueues.length === 0) return;
         const timer = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    showAlert('หมดเวลา!', 'หมดเวลาทำรายการจอง กรุณาเลือกล็อกใหม่ครับ', 'error');
-                    setStep(2);
-                    setSelectedLocks([]);
-                    return 0;
-                }
-                return prev - 1;
-            });
+            if (timeLeft > 0) {
+                setTimeLeft(prev => {
+                    if (prev <= 1) {
+                        showAlert('หมดเวลา!', 'หมดเวลาทำรายการจอง กรุณาเลือกล็อกใหม่ครับ', 'error');
+                        setStep(2);
+                        setSelectedLocks([]);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }
+
+            // Also check if any queue entry expired to remove it from UI
+            setUserQueues(prev => prev.filter(q => new Date(q.expiresAt).getTime() > Date.now()));
         }, 1000);
         return () => clearInterval(timer);
-    }, [timeLeft]);
+    }, [timeLeft, userQueues]);
 
     const handleDateSelect = (d: typeof dates[0]) => {
         setSelectedDateInfo(d);
@@ -239,6 +253,12 @@ export default function BookingPage() {
             if (!res.ok) {
                 if (data.isQueued) {
                     showAlert('ลงคิวสำเร็จ 📋', data.error || 'คุณอยู่ในคิวรอสำหรับพื้นที่นี้แล้ว', 'info');
+                    // Refresh user queues
+                    fetch(`/api/bookings?date=${selectedDateInfo?.date}`)
+                        .then(r => r.json())
+                        .then(d => {
+                            if (d.userQueues) setUserQueues(d.userQueues);
+                        });
                 } else {
                     showAlert('ขออภัย', data.error || 'ไม่สามารถจองได้ในขณะนี้', 'error');
                 }
@@ -406,6 +426,59 @@ export default function BookingPage() {
                                 {selectedDateInfo.dayName} {selectedDateInfo.label}
                             </div>
                         </div>
+
+                        {/* Your Active Queues Section */}
+                        {userQueues.length > 0 && (
+                            <div style={{
+                                marginBottom: '1.5rem',
+                                padding: '1rem',
+                                background: '#f0f9ff',
+                                borderRadius: 'var(--radius-md)',
+                                border: '1px solid #bae6fd'
+                            }}>
+                                <h3 style={{ fontSize: '0.95rem', color: '#0369a1', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Bell size={18} /> คิวที่คุณรออยู่ ({userQueues.length})
+                                </h3>
+                                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                    {userQueues.map(q => {
+                                        const timeLeftSec = Math.max(0, Math.floor((new Date(q.expiresAt).getTime() - Date.now()) / 1000));
+                                        const isFirst = q.position === 1;
+                                        return (
+                                            <div key={q.lockId} style={{
+                                                background: 'white',
+                                                padding: '0.75rem 1rem',
+                                                borderRadius: '12px',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '1rem',
+                                                borderLeft: `4px solid ${isFirst ? '#22c55e' : '#0284c7'}`,
+                                                animation: isFirst ? 'pulse-green 2s infinite' : 'none'
+                                            }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 'bold', fontSize: '1rem', color: isFirst ? '#166534' : '#0c4a6e' }}>
+                                                        ล็อก {q.lockId} {isFirst && '✅'}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                                        {isFirst ? 'ถึงคิวของคุณแล้ว! กดที่ล็อกเพื่อจอง' : `ลำดับที่ ${q.position}`}
+                                                    </div>
+                                                </div>
+                                                <div style={{
+                                                    background: '#f1f5f9',
+                                                    padding: '4px 8px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 'bold',
+                                                    color: timeLeftSec < 60 ? '#ef4444' : '#64748b'
+                                                }}>
+                                                    {Math.floor(timeLeftSec / 60)}:{String(timeLeftSec % 60).padStart(2, '0')}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Zone Selection & Map Map */}
                         <div style={{ marginBottom: '2rem' }}>

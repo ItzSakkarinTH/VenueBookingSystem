@@ -40,7 +40,27 @@ export async function GET(req: Request) {
         };
     });
 
-    return NextResponse.json({ bookings: transformedBookings });
+    const user = await getUserFromCookie();
+    const userQueues = user ? queues.filter(q => q.userId.toString() === user.userId) : [];
+
+    const formattedUserQueues = userQueues.map(uq => {
+        const lockQueue = queues
+            .filter(q => q.lockId === uq.lockId)
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+        const position = lockQueue.findIndex(q => q._id.toString() === uq._id.toString()) + 1;
+
+        return {
+            lockId: uq.lockId,
+            position,
+            expiresAt: uq.expiresAt
+        };
+    });
+
+    return NextResponse.json({
+        bookings: transformedBookings,
+        userQueues: formattedUserQueues
+    });
 }
 
 export async function POST(req: Request) {
