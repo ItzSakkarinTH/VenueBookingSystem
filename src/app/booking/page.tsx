@@ -86,6 +86,17 @@ export default function BookingPage() {
         expiresAt: string;
     }
 
+    interface BookingResponse {
+        lockId: string;
+        userId?: { name?: string };
+        guestName?: string;
+        status: string;
+        queueCount?: number;
+        date?: string;
+        paymentGroupId?: string;
+        paymentDeadline?: string;
+    }
+
     // Lock Selection
     const [occupiedLocks, setOccupiedLocks] = useState<string[]>([]);
     const [bookingsInfo, setBookingsInfo] = useState<BookingInfo[]>([]);
@@ -126,7 +137,6 @@ export default function BookingPage() {
         setDates(getUpcomingDates());
 
         // Use 'name' or 'role' cookie to check login status
-        // 'token' is httpOnly and cannot be read from client-side JavaScript
         const nameCookie = getCookie('name');
         const roleCookie = getCookie('role');
         const isUserLoggedIn = !!(nameCookie || roleCookie);
@@ -143,6 +153,25 @@ export default function BookingPage() {
                 })
                 .catch(() => { });
         }
+
+        // Check for existing holds or queues on mount
+        fetch('/api/bookings')
+            .then(res => res.json())
+            .then(data => {
+                if (data.myActiveHold) {
+                    const heldDate = data.myActiveHold.date;
+                    const availableDates = getUpcomingDates();
+                    const dateInfo = availableDates.find(d => d.date === heldDate);
+
+                    if (dateInfo) {
+                        setSelectedDateInfo(dateInfo);
+                    }
+                }
+                if (data.userQueues && data.userQueues.length > 0) {
+                    setUserQueues(data.userQueues);
+                }
+            })
+            .catch(() => { });
     }, []);
 
     // Zone Selection
@@ -165,13 +194,6 @@ export default function BookingPage() {
                     setOccupiedLocks(data.bookings.map((b: { lockId: string }) => b.lockId));
 
                     // Store booking info with booker names
-                    interface BookingResponse {
-                        lockId: string;
-                        userId?: { name?: string };
-                        guestName?: string;
-                        status: string;
-                        queueCount?: number;
-                    }
                     const infos: BookingInfo[] = data.bookings.map((b: BookingResponse) => ({
                         lockId: b.lockId,
                         bookerName: b.userId?.name || b.guestName || 'ไม่ระบุชื่อ',
@@ -182,6 +204,27 @@ export default function BookingPage() {
                 }
                 if (data.userQueues) {
                     setUserQueues(data.userQueues);
+                }
+
+                // Auto-resume if there's an active hold for this user
+                if (data.myActiveHold && data.myActiveHold.date === selectedDateInfo.date) {
+                    const groupBookings = data.bookings.filter((b: BookingResponse) =>
+                        b.paymentGroupId === data.myActiveHold.paymentGroupId
+                    );
+
+                    const heldLocks = groupBookings.map((gb: BookingResponse) => {
+                        const dayType = gb.date ? (new Date(gb.date).getDay() === 0 ? 'Sunday' : 'Saturday') : selectedDateInfo.key;
+                        const locksForDay = GENERATE_LOCKS(dayType as 'Sunday' | 'Saturday');
+                        return locksForDay.find(l => l.id === gb.lockId);
+                    }).filter((l: LockDef | undefined): l is LockDef => !!l);
+
+                    if (heldLocks.length > 0) {
+                        setSelectedLocks(heldLocks);
+                        setStep(3);
+                        const deadline = new Date(data.myActiveHold.paymentDeadline).getTime();
+                        setTimeLeft(Math.max(0, Math.floor((deadline - Date.now()) / 1000)));
+                        showAlert('ยินดีต้อนรับกลับครับ 👋', 'ระบบนำคุณกลับมายังรายการจองที่ค้างอยู่เพื่อให้คุณดำเนินการต่อได้ทันทีครับ', 'info');
+                    }
                 }
             })
             .catch(err => console.error(err))
@@ -443,6 +486,14 @@ export default function BookingPage() {
                                     {userQueues.map(q => {
                                         const timeLeftSec = Math.max(0, Math.floor((new Date(q.expiresAt).getTime() - Date.now()) / 1000));
                                         const isFirst = q.position === 1;
+
+                                        const handleLeaveQueue = async (e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            if (!confirm('ยืนยันออกจากคิวสำหรับล็อก ' + q.lockId + '?')) return;
+                                            await fetch(`/api/bookings/queue/leave?lockId=${q.lockId}&date=${selectedDateInfo?.date}`, { method: 'DELETE' });
+                                            setUserQueues(prev => prev.filter(item => item.lockId !== q.lockId));
+                                        };
+
                                         return (
                                             <div key={q.lockId} style={{
                                                 background: 'white',
@@ -453,7 +504,8 @@ export default function BookingPage() {
                                                 alignItems: 'center',
                                                 gap: '1rem',
                                                 borderLeft: `4px solid ${isFirst ? '#22c55e' : '#0284c7'}`,
-                                                animation: isFirst ? 'pulse-green 2s infinite' : 'none'
+                                                animation: isFirst ? 'pulse-green 2s infinite' : 'none',
+                                                position: 'relative'
                                             }}>
                                                 <div>
                                                     <div style={{ fontWeight: 'bold', fontSize: '1rem', color: isFirst ? '#166534' : '#0c4a6e' }}>
@@ -463,15 +515,23 @@ export default function BookingPage() {
                                                         {isFirst ? 'ถึงคิวของคุณแล้ว! กดที่ล็อกเพื่อจอง' : `ลำดับที่ ${q.position}`}
                                                     </div>
                                                 </div>
-                                                <div style={{
-                                                    background: '#f1f5f9',
-                                                    padding: '4px 8px',
-                                                    borderRadius: '6px',
-                                                    fontSize: '0.8rem',
-                                                    fontWeight: 'bold',
-                                                    color: timeLeftSec < 60 ? '#ef4444' : '#64748b'
-                                                }}>
-                                                    {Math.floor(timeLeftSec / 60)}:{String(timeLeftSec % 60).padStart(2, '0')}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <div style={{
+                                                        background: '#f1f5f9',
+                                                        padding: '4px 8px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 'bold',
+                                                        color: timeLeftSec < 60 ? '#ef4444' : '#64748b'
+                                                    }}>
+                                                        {Math.floor(timeLeftSec / 60)}:{String(timeLeftSec % 60).padStart(2, '0')}
+                                                    </div>
+                                                    <button
+                                                        onClick={handleLeaveQueue}
+                                                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
                                                 </div>
                                             </div>
                                         );
@@ -887,9 +947,24 @@ export default function BookingPage() {
                                 <div style={{
                                     background: '#ffe4e6', color: '#e11d48',
                                     padding: '0.5rem 1rem', borderRadius: '20px',
-                                    fontSize: '0.9rem', fontWeight: 'bold'
+                                    fontSize: '0.9rem', fontWeight: 'bold',
+                                    display: 'flex', alignItems: 'center', gap: '0.5rem'
                                 }}>
-                                    ⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                                    <span>⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</span>
+                                    <button
+                                        onClick={async () => {
+                                            if (confirm('ต้องการสละสิทธิ์การจองนี้?')) {
+                                                await fetch(`/api/bookings/hold/release?lockIds=${selectedLocks.map(l => l.id).join(',')}&date=${selectedDateInfo?.date}`, { method: 'DELETE' });
+                                                setStep(2);
+                                                setSelectedLocks([]);
+                                                setTimeLeft(0);
+                                                window.location.reload(); // Refresh to update occupied status
+                                            }
+                                        }}
+                                        style={{ background: '#e11d48', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem' }}
+                                    >
+                                        ปล่อยล็อก
+                                    </button>
                                 </div>
                             )}
                         </div>
