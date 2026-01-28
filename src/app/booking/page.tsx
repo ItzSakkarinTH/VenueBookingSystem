@@ -78,6 +78,7 @@ export default function BookingPage() {
         bookerName: string;
         status: string;
         queueCount?: number;
+        paymentDeadline?: string;
     }
 
     interface UserQueue {
@@ -198,7 +199,8 @@ export default function BookingPage() {
                         lockId: b.lockId,
                         bookerName: b.userId?.name || b.guestName || 'ไม่ระบุชื่อ',
                         status: b.status,
-                        queueCount: b.queueCount || 0
+                        queueCount: b.queueCount || 0,
+                        paymentDeadline: b.paymentDeadline
                     }));
                     setBookingsInfo(infos);
                 }
@@ -486,6 +488,16 @@ export default function BookingPage() {
                                     {userQueues.map(q => {
                                         const timeLeftSec = Math.max(0, Math.floor((new Date(q.expiresAt).getTime() - Date.now()) / 1000));
                                         const isFirst = q.position === 1;
+                                        const lockStatus = bookingsInfo.find(b => b.lockId === q.lockId);
+                                        const isHeld = lockStatus && lockStatus.status === 'holding';
+                                        const isBooked = lockStatus && ['pending', 'approved'].includes(lockStatus.status);
+
+                                        // Use holder's deadline if we are first and they are still holding it
+                                        let displayTime = timeLeftSec;
+                                        if (isFirst && isHeld && lockStatus?.paymentDeadline) {
+                                            const holderDeadline = new Date(lockStatus.paymentDeadline).getTime();
+                                            displayTime = Math.max(0, Math.floor((holderDeadline - Date.now()) / 1000));
+                                        }
 
                                         const handleLeaveQueue = async (e: React.MouseEvent) => {
                                             e.stopPropagation();
@@ -509,10 +521,16 @@ export default function BookingPage() {
                                             }}>
                                                 <div>
                                                     <div style={{ fontWeight: 'bold', fontSize: '1rem', color: isFirst ? '#166534' : '#0c4a6e' }}>
-                                                        ล็อก {q.lockId} {isFirst && '✅'}
+                                                        ล็อก {q.lockId} {isFirst ? (isHeld ? '⏳' : '✅') : ''}
                                                     </div>
                                                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                                        {isFirst ? 'ถึงคิวของคุณแล้ว! กดที่ล็อกเพื่อจอง' : `ลำดับที่ ${q.position}`}
+                                                        {(() => {
+                                                            if (isBooked) return 'ล็อกนี้ถูกจองไปแล้ว (คิวจะถูกยกเลิก)';
+                                                            if (isFirst) {
+                                                                return isHeld ? 'คุณเป็นคิวถัดไป (รอคนก่อนหน้าปล่อยล็อก)' : 'ถึงคิวของคุณแล้ว! กดที่ล็อกเพื่อจอง';
+                                                            }
+                                                            return `ลำดับที่ ${q.position}`;
+                                                        })()}
                                                     </div>
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -522,9 +540,9 @@ export default function BookingPage() {
                                                         borderRadius: '6px',
                                                         fontSize: '0.8rem',
                                                         fontWeight: 'bold',
-                                                        color: timeLeftSec < 60 ? '#ef4444' : '#64748b'
+                                                        color: displayTime < 60 ? '#ef4444' : '#64748b'
                                                     }}>
-                                                        {Math.floor(timeLeftSec / 60)}:{String(timeLeftSec % 60).padStart(2, '0')}
+                                                        {Math.floor(displayTime / 60)}:{String(displayTime % 60).padStart(2, '0')}
                                                     </div>
                                                     <button
                                                         onClick={handleLeaveQueue}
