@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
-import Booking from '@/models/Booking';
+import Booking, { IBooking } from '@/models/Booking';
+import LockQueue, { ILockQueue } from '@/models/LockQueue';
 import { getUserFromCookie } from '@/lib/auth';
 
 export async function GET(req: Request) {
@@ -8,28 +9,80 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date');
 
-    if (!date) return NextResponse.json({ error: 'Date required' }, { status: 400 });
+    interface TransformedBooking extends Partial<Omit<IBooking, 'status'>> {
+        status: string;
+        bookerName?: string;
+        queueCount?: number;
+        isHold?: boolean;
+    }
 
-    // Include booker info for display - populate userId to get name
-    const bookings = await Booking.find({ date })
-        .populate('userId', 'name phone')
-        .select('lockId userId guestName guestPhone status')
-        .lean();
+    let transformedBookings: TransformedBooking[] = [];
+    let queues: ILockQueue[] = [];
 
-    // Mapping for frontend - map 'awaiting_payment' to 'holding' status
-    const transformedBookings = bookings.map(b => {
-        if (b.status === 'awaiting_payment') {
+    if (date) {
+        // Include booker info for display - populate userId to get name
+        const bookings = await Booking.find({ date })
+            .populate('userId', 'name phone')
+            .select('lockId userId guestName guestPhone status paymentDeadline paymentGroupId')
+            .lean();
+
+        // Fetch queues for this date
+        queues = await LockQueue.find({ date }).lean();
+
+        // Mapping for frontend - map 'awaiting_payment' to 'holding' status
+        transformedBookings = bookings.map(b => {
+            const queueForLock = queues.filter(q => q.lockId === b.lockId);
+            const queueCount = queueForLock.length;
+
+            if (b.status === 'awaiting_payment') {
+                return {
+                    ...b,
+                    status: 'holding',
+                    guestName: 'กำลังทำรายการ',
+                    isHold: true,
+                    queueCount
+                };
+            }
             return {
                 ...b,
-                status: 'holding',
-                guestName: 'กำลังทำรายการ',
-                isHold: true
+                queueCount
             };
-        }
-        return b;
-    });
+        });
+    } else {
+        // Even without date, we might want to know all queues in general for the user
+        queues = await LockQueue.find().lean();
+    }
 
-    return NextResponse.json({ bookings: transformedBookings });
+    const user = await getUserFromCookie();
+
+    const formattedUserQueues = queues
+        .filter(q => user && q.userId.toString() === user.userId)
+        .map(uq => {
+            const lockQueue = queues
+                .filter(q => q.lockId === uq.lockId && q.date === uq.date)
+                .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+            const position = lockQueue.findIndex(q => q._id.toString() === uq._id.toString()) + 1;
+
+            return {
+                lockId: uq.lockId,
+                date: uq.date,
+                position,
+                expiresAt: uq.expiresAt
+            };
+        });
+
+    // Find any active hold by this user (check database directly to be sure and scope independent)
+    const myActiveHold = user ? await Booking.findOne({
+        status: 'awaiting_payment',
+        userId: user.userId
+    }).lean() : null;
+
+    return NextResponse.json({
+        bookings: transformedBookings,
+        userQueues: formattedUserQueues,
+        myActiveHold
+    });
 }
 
 export async function POST(req: Request) {

@@ -77,6 +77,25 @@ export default function BookingPage() {
         lockId: string;
         bookerName: string;
         status: string;
+        queueCount?: number;
+        paymentDeadline?: string;
+    }
+
+    interface UserQueue {
+        lockId: string;
+        position: number;
+        expiresAt: string;
+    }
+
+    interface BookingResponse {
+        lockId: string;
+        userId?: { name?: string };
+        guestName?: string;
+        status: string;
+        queueCount?: number;
+        date?: string;
+        paymentGroupId?: string;
+        paymentDeadline?: string;
     }
 
     // Lock Selection
@@ -85,6 +104,7 @@ export default function BookingPage() {
     const [selectedLocks, setSelectedLocks] = useState<LockDef[]>([]);
     const [timeLeft, setTimeLeft] = useState(0);
     const [locks, setLocks] = useState<LockDef[]>([]);
+    const [userQueues, setUserQueues] = useState<UserQueue[]>([]);
 
     // User Info
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -118,7 +138,6 @@ export default function BookingPage() {
         setDates(getUpcomingDates());
 
         // Use 'name' or 'role' cookie to check login status
-        // 'token' is httpOnly and cannot be read from client-side JavaScript
         const nameCookie = getCookie('name');
         const roleCookie = getCookie('role');
         const isUserLoggedIn = !!(nameCookie || roleCookie);
@@ -135,6 +154,25 @@ export default function BookingPage() {
                 })
                 .catch(() => { });
         }
+
+        // Check for existing holds or queues on mount
+        fetch('/api/bookings')
+            .then(res => res.json())
+            .then(data => {
+                if (data.myActiveHold) {
+                    const heldDate = data.myActiveHold.date;
+                    const availableDates = getUpcomingDates();
+                    const dateInfo = availableDates.find(d => d.date === heldDate);
+
+                    if (dateInfo) {
+                        setSelectedDateInfo(dateInfo);
+                    }
+                }
+                if (data.userQueues && data.userQueues.length > 0) {
+                    setUserQueues(data.userQueues);
+                }
+            })
+            .catch(() => { });
     }, []);
 
     // Zone Selection
@@ -157,18 +195,38 @@ export default function BookingPage() {
                     setOccupiedLocks(data.bookings.map((b: { lockId: string }) => b.lockId));
 
                     // Store booking info with booker names
-                    interface BookingResponse {
-                        lockId: string;
-                        userId?: { name?: string };
-                        guestName?: string;
-                        status: string;
-                    }
                     const infos: BookingInfo[] = data.bookings.map((b: BookingResponse) => ({
                         lockId: b.lockId,
                         bookerName: b.userId?.name || b.guestName || 'ไม่ระบุชื่อ',
-                        status: b.status
+                        status: b.status,
+                        queueCount: b.queueCount || 0,
+                        paymentDeadline: b.paymentDeadline
                     }));
                     setBookingsInfo(infos);
+                }
+                if (data.userQueues) {
+                    setUserQueues(data.userQueues);
+                }
+
+                // Auto-resume if there's an active hold for this user
+                if (data.myActiveHold && data.myActiveHold.date === selectedDateInfo.date) {
+                    const groupBookings = data.bookings.filter((b: BookingResponse) =>
+                        b.paymentGroupId === data.myActiveHold.paymentGroupId
+                    );
+
+                    const heldLocks = groupBookings.map((gb: BookingResponse) => {
+                        const dayType = gb.date ? (new Date(gb.date).getDay() === 0 ? 'Sunday' : 'Saturday') : selectedDateInfo.key;
+                        const locksForDay = GENERATE_LOCKS(dayType as 'Sunday' | 'Saturday');
+                        return locksForDay.find(l => l.id === gb.lockId);
+                    }).filter((l: LockDef | undefined): l is LockDef => !!l);
+
+                    if (heldLocks.length > 0) {
+                        setSelectedLocks(heldLocks);
+                        setStep(3);
+                        const deadline = new Date(data.myActiveHold.paymentDeadline).getTime();
+                        setTimeLeft(Math.max(0, Math.floor((deadline - Date.now()) / 1000)));
+                        showAlert('ยินดีต้อนรับกลับครับ 👋', 'ระบบนำคุณกลับมายังรายการจองที่ค้างอยู่เพื่อให้คุณดำเนินการต่อได้ทันทีครับ', 'info');
+                    }
                 }
             })
             .catch(err => console.error(err))
@@ -178,21 +236,25 @@ export default function BookingPage() {
 
     // Timer Effect
     useEffect(() => {
-        if (timeLeft <= 0) return;
+        if (timeLeft <= 0 && userQueues.length === 0) return;
         const timer = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    showAlert('หมดเวลา!', 'หมดเวลาทำรายการจอง กรุณาเลือกล็อกใหม่ครับ', 'error');
-                    setStep(2);
-                    setSelectedLocks([]);
-                    return 0;
-                }
-                return prev - 1;
-            });
+            if (timeLeft > 0) {
+                setTimeLeft(prev => {
+                    if (prev <= 1) {
+                        showAlert('หมดเวลา!', 'หมดเวลาทำรายการจอง กรุณาเลือกล็อกใหม่ครับ', 'error');
+                        setStep(2);
+                        setSelectedLocks([]);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }
+
+            // Also check if any queue entry expired to remove it from UI
+            setUserQueues(prev => prev.filter(q => new Date(q.expiresAt).getTime() > Date.now()));
         }, 1000);
         return () => clearInterval(timer);
-    }, [timeLeft]);
+    }, [timeLeft, userQueues]);
 
     const handleDateSelect = (d: typeof dates[0]) => {
         setSelectedDateInfo(d);
@@ -201,7 +263,9 @@ export default function BookingPage() {
     };
 
     const handleLockClick = (lock: LockDef) => {
-        if (occupiedLocks.includes(lock.id)) return;
+        const booking = bookingsInfo.find(b => b.lockId === lock.id);
+        const isReallyBooked = booking && ['pending', 'approved'].includes(booking.status);
+        if (isReallyBooked) return;
 
         setSelectedLocks(prev => {
             const exists = prev.find(l => l.id === lock.id);
@@ -232,7 +296,17 @@ export default function BookingPage() {
             });
             const data = await res.json();
             if (!res.ok) {
-                showAlert('ขออภัย', data.error || 'ไม่สามารถจองได้ในขณะนี้', 'error');
+                if (data.isQueued) {
+                    showAlert('ลงคิวสำเร็จ 📋', data.error || 'คุณอยู่ในคิวรอสำหรับพื้นที่นี้แล้ว', 'info');
+                    // Refresh user queues
+                    fetch(`/api/bookings?date=${selectedDateInfo?.date}`)
+                        .then(r => r.json())
+                        .then(d => {
+                            if (d.userQueues) setUserQueues(d.userQueues);
+                        });
+                } else {
+                    showAlert('ขออภัย', data.error || 'ไม่สามารถจองได้ในขณะนี้', 'error');
+                }
                 return;
             }
 
@@ -397,6 +471,92 @@ export default function BookingPage() {
                                 {selectedDateInfo.dayName} {selectedDateInfo.label}
                             </div>
                         </div>
+
+                        {/* Your Active Queues Section */}
+                        {userQueues.length > 0 && (
+                            <div style={{
+                                marginBottom: '1.5rem',
+                                padding: '1rem',
+                                background: '#f0f9ff',
+                                borderRadius: 'var(--radius-md)',
+                                border: '1px solid #bae6fd'
+                            }}>
+                                <h3 style={{ fontSize: '0.95rem', color: '#0369a1', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Bell size={18} /> คิวที่คุณรออยู่ ({userQueues.length})
+                                </h3>
+                                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                    {userQueues.map(q => {
+                                        const timeLeftSec = Math.max(0, Math.floor((new Date(q.expiresAt).getTime() - Date.now()) / 1000));
+                                        const isFirst = q.position === 1;
+                                        const lockStatus = bookingsInfo.find(b => b.lockId === q.lockId);
+                                        const isHeld = lockStatus && lockStatus.status === 'holding';
+                                        const isBooked = lockStatus && ['pending', 'approved'].includes(lockStatus.status);
+
+                                        // Use holder's deadline if we are first and they are still holding it
+                                        let displayTime = timeLeftSec;
+                                        if (isFirst && isHeld && lockStatus?.paymentDeadline) {
+                                            const holderDeadline = new Date(lockStatus.paymentDeadline).getTime();
+                                            displayTime = Math.max(0, Math.floor((holderDeadline - Date.now()) / 1000));
+                                        }
+
+                                        const handleLeaveQueue = async (e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            if (!confirm('ยืนยันออกจากคิวสำหรับล็อก ' + q.lockId + '?')) return;
+                                            await fetch(`/api/bookings/queue/leave?lockId=${q.lockId}&date=${selectedDateInfo?.date}`, { method: 'DELETE' });
+                                            setUserQueues(prev => prev.filter(item => item.lockId !== q.lockId));
+                                        };
+
+                                        return (
+                                            <div key={q.lockId} style={{
+                                                background: 'white',
+                                                padding: '0.75rem 1rem',
+                                                borderRadius: '12px',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '1rem',
+                                                borderLeft: `4px solid ${isFirst ? '#22c55e' : '#0284c7'}`,
+                                                animation: isFirst ? 'pulse-green 2s infinite' : 'none',
+                                                position: 'relative'
+                                            }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 'bold', fontSize: '1rem', color: isFirst ? '#166534' : '#0c4a6e' }}>
+                                                        ล็อก {q.lockId} {isFirst ? (isHeld ? '⏳' : '✅') : ''}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                                        {(() => {
+                                                            if (isBooked) return 'ล็อกนี้ถูกจองไปแล้ว (คิวจะถูกยกเลิก)';
+                                                            if (isFirst) {
+                                                                return isHeld ? 'คุณเป็นคิวถัดไป (รอคนก่อนหน้าปล่อยล็อก)' : 'ถึงคิวของคุณแล้ว! กดที่ล็อกเพื่อจอง';
+                                                            }
+                                                            return `ลำดับที่ ${q.position}`;
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <div style={{
+                                                        background: '#f1f5f9',
+                                                        padding: '4px 8px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 'bold',
+                                                        color: displayTime < 60 ? '#ef4444' : '#64748b'
+                                                    }}>
+                                                        {Math.floor(displayTime / 60)}:{String(displayTime % 60).padStart(2, '0')}
+                                                    </div>
+                                                    <button
+                                                        onClick={handleLeaveQueue}
+                                                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Zone Selection & Map Map */}
                         <div style={{ marginBottom: '2rem' }}>
@@ -613,12 +773,16 @@ export default function BookingPage() {
                                                         const bookingInfo = bookingsInfo.find(b => b.lockId === lock.id);
 
                                                         const handleClick = () => {
-                                                            if (isBooked && bookingInfo) {
+                                                            const isReallyBooked = isBooked && ['pending', 'approved'].includes(bookingInfo?.status || '');
+                                                            if (isReallyBooked && bookingInfo) {
                                                                 setViewBookedLock(bookingInfo);
-                                                            } else if (!isBooked) {
+                                                            } else {
                                                                 handleLockClick(lock);
                                                             }
                                                         };
+
+                                                        const isHeld = bookingInfo?.status === 'holding' || bookingInfo?.status === 'awaiting_payment';
+                                                        const isActuallyBooked = isBooked && !isHeld;
 
                                                         return (
                                                             <div
@@ -628,8 +792,8 @@ export default function BookingPage() {
                                                                     width: '55px',
                                                                     height: '55px',
                                                                     borderRadius: '8px',
-                                                                    border: `2px solid ${isBooked ? '#f59e0b' : isSelected ? 'var(--primary-orange)' : zone?.color}`,
-                                                                    background: isBooked ? '#fef3c7' : isSelected ? 'var(--orange-light)' : 'white',
+                                                                    border: `2px solid ${isActuallyBooked ? '#f59e0b' : isSelected ? 'var(--primary-orange)' : isHeld ? '#94a3b8' : zone?.color}`,
+                                                                    background: isActuallyBooked ? '#fef3c7' : isSelected ? 'var(--orange-light)' : isHeld ? '#f1f5f9' : 'white',
                                                                     display: 'flex',
                                                                     flexDirection: 'column',
                                                                     alignItems: 'center',
@@ -642,22 +806,39 @@ export default function BookingPage() {
                                                                 }}
                                                                 onMouseEnter={(e) => (e.currentTarget.style.transform = isSelected ? 'scale(0.95)' : 'scale(1.05)')}
                                                                 onMouseLeave={(e) => (e.currentTarget.style.transform = isSelected ? 'scale(0.95)' : 'scale(1)')}
-                                                                title={isBooked ? `จองโดย: ${bookingInfo?.bookerName || 'ไม่ระบุ'}` : 'ว่าง - คลิกเพื่อจอง'}
+                                                                title={isBooked ? `จองโดย: ${bookingInfo?.bookerName || 'ไม่ระบุ'}${bookingInfo?.queueCount ? ` (มีคิวรอ: ${bookingInfo.queueCount})` : ''}` : 'ว่าง - คลิกเพื่อจอง'}
                                                             >
+                                                                {bookingInfo?.queueCount ? (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        top: '-5px',
+                                                                        right: '-5px',
+                                                                        background: '#ef4444',
+                                                                        color: 'white',
+                                                                        fontSize: '0.65rem',
+                                                                        fontWeight: 'bold',
+                                                                        padding: '2px 5px',
+                                                                        borderRadius: '10px',
+                                                                        zIndex: 2,
+                                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                                    }}>
+                                                                        คิว {bookingInfo.queueCount}
+                                                                    </div>
+                                                                ) : null}
                                                                 <div style={{
                                                                     fontWeight: 'bold',
                                                                     fontSize: '0.9rem',
-                                                                    color: isBooked ? '#b45309' : isSelected ? 'var(--primary-orange)' : zone?.color
+                                                                    color: isActuallyBooked ? '#b45309' : isSelected ? 'var(--primary-orange)' : isHeld ? '#64748b' : zone?.color
                                                                 }}>
                                                                     {lock.id}
                                                                 </div>
                                                                 <div style={{
                                                                     fontSize: '0.6rem',
-                                                                    color: isBooked ? '#b45309' : isSelected ? 'var(--primary-orange)' : '#64748b',
+                                                                    color: isActuallyBooked ? '#b45309' : isSelected ? 'var(--primary-orange)' : isHeld ? '#64748b' : '#64748b',
                                                                     textAlign: 'center',
                                                                     lineHeight: 1.1
                                                                 }}>
-                                                                    {isBooked ? '🔒 ดู' : `${lock.price}฿`}
+                                                                    {isActuallyBooked ? '🔒 ดู' : isHeld ? '⏳ คิว' : `${lock.price}฿`}
                                                                 </div>
                                                             </div>
                                                         );
@@ -706,6 +887,15 @@ export default function BookingPage() {
                                             borderRadius: '4px'
                                         }} />
                                         <span>ที่เลือก</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <div style={{
+                                            width: '12px',
+                                            height: '12px',
+                                            background: '#ef4444',
+                                            borderRadius: '50%',
+                                        }} />
+                                        <span>มีคนรอคิว</span>
                                     </div>
                                 </div>
 
@@ -775,9 +965,24 @@ export default function BookingPage() {
                                 <div style={{
                                     background: '#ffe4e6', color: '#e11d48',
                                     padding: '0.5rem 1rem', borderRadius: '20px',
-                                    fontSize: '0.9rem', fontWeight: 'bold'
+                                    fontSize: '0.9rem', fontWeight: 'bold',
+                                    display: 'flex', alignItems: 'center', gap: '0.5rem'
                                 }}>
-                                    ⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                                    <span>⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</span>
+                                    <button
+                                        onClick={async () => {
+                                            if (confirm('ต้องการสละสิทธิ์การจองนี้?')) {
+                                                await fetch(`/api/bookings/hold/release?lockIds=${selectedLocks.map(l => l.id).join(',')}&date=${selectedDateInfo?.date}`, { method: 'DELETE' });
+                                                setStep(2);
+                                                setSelectedLocks([]);
+                                                setTimeLeft(0);
+                                                window.location.reload(); // Refresh to update occupied status
+                                            }
+                                        }}
+                                        style={{ background: '#e11d48', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem' }}
+                                    >
+                                        ปล่อยล็อก
+                                    </button>
                                 </div>
                             )}
                         </div>
