@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Booking from '@/models/Booking';
+import LockQueue from '@/models/LockQueue';
 import { getUserFromCookie } from '@/lib/auth';
 
 export async function GET(req: Request) {
@@ -16,17 +17,27 @@ export async function GET(req: Request) {
         .select('lockId userId guestName guestPhone status')
         .lean();
 
+    // Fetch queues for this date
+    const queues = await LockQueue.find({ date }).lean();
+
     // Mapping for frontend - map 'awaiting_payment' to 'holding' status
     const transformedBookings = bookings.map(b => {
+        const queueForLock = queues.filter(q => q.lockId === b.lockId);
+        const queueCount = queueForLock.length;
+
         if (b.status === 'awaiting_payment') {
             return {
                 ...b,
                 status: 'holding',
                 guestName: 'กำลังทำรายการ',
-                isHold: true
+                isHold: true,
+                queueCount
             };
         }
-        return b;
+        return {
+            ...b,
+            queueCount
+        };
     });
 
     return NextResponse.json({ bookings: transformedBookings });

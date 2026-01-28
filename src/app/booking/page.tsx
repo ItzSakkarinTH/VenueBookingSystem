@@ -77,6 +77,7 @@ export default function BookingPage() {
         lockId: string;
         bookerName: string;
         status: string;
+        queueCount?: number;
     }
 
     // Lock Selection
@@ -162,11 +163,13 @@ export default function BookingPage() {
                         userId?: { name?: string };
                         guestName?: string;
                         status: string;
+                        queueCount?: number;
                     }
                     const infos: BookingInfo[] = data.bookings.map((b: BookingResponse) => ({
                         lockId: b.lockId,
                         bookerName: b.userId?.name || b.guestName || 'ไม่ระบุชื่อ',
-                        status: b.status
+                        status: b.status,
+                        queueCount: b.queueCount || 0
                     }));
                     setBookingsInfo(infos);
                 }
@@ -201,7 +204,9 @@ export default function BookingPage() {
     };
 
     const handleLockClick = (lock: LockDef) => {
-        if (occupiedLocks.includes(lock.id)) return;
+        const booking = bookingsInfo.find(b => b.lockId === lock.id);
+        const isReallyBooked = booking && ['pending', 'approved'].includes(booking.status);
+        if (isReallyBooked) return;
 
         setSelectedLocks(prev => {
             const exists = prev.find(l => l.id === lock.id);
@@ -232,7 +237,11 @@ export default function BookingPage() {
             });
             const data = await res.json();
             if (!res.ok) {
-                showAlert('ขออภัย', data.error || 'ไม่สามารถจองได้ในขณะนี้', 'error');
+                if (data.isQueued) {
+                    showAlert('ลงคิวสำเร็จ 📋', data.error || 'คุณอยู่ในคิวรอสำหรับพื้นที่นี้แล้ว', 'info');
+                } else {
+                    showAlert('ขออภัย', data.error || 'ไม่สามารถจองได้ในขณะนี้', 'error');
+                }
                 return;
             }
 
@@ -613,12 +622,16 @@ export default function BookingPage() {
                                                         const bookingInfo = bookingsInfo.find(b => b.lockId === lock.id);
 
                                                         const handleClick = () => {
-                                                            if (isBooked && bookingInfo) {
+                                                            const isReallyBooked = isBooked && ['pending', 'approved'].includes(bookingInfo?.status || '');
+                                                            if (isReallyBooked && bookingInfo) {
                                                                 setViewBookedLock(bookingInfo);
-                                                            } else if (!isBooked) {
+                                                            } else {
                                                                 handleLockClick(lock);
                                                             }
                                                         };
+
+                                                        const isHeld = bookingInfo?.status === 'holding' || bookingInfo?.status === 'awaiting_payment';
+                                                        const isActuallyBooked = isBooked && !isHeld;
 
                                                         return (
                                                             <div
@@ -628,8 +641,8 @@ export default function BookingPage() {
                                                                     width: '55px',
                                                                     height: '55px',
                                                                     borderRadius: '8px',
-                                                                    border: `2px solid ${isBooked ? '#f59e0b' : isSelected ? 'var(--primary-orange)' : zone?.color}`,
-                                                                    background: isBooked ? '#fef3c7' : isSelected ? 'var(--orange-light)' : 'white',
+                                                                    border: `2px solid ${isActuallyBooked ? '#f59e0b' : isSelected ? 'var(--primary-orange)' : isHeld ? '#94a3b8' : zone?.color}`,
+                                                                    background: isActuallyBooked ? '#fef3c7' : isSelected ? 'var(--orange-light)' : isHeld ? '#f1f5f9' : 'white',
                                                                     display: 'flex',
                                                                     flexDirection: 'column',
                                                                     alignItems: 'center',
@@ -642,22 +655,39 @@ export default function BookingPage() {
                                                                 }}
                                                                 onMouseEnter={(e) => (e.currentTarget.style.transform = isSelected ? 'scale(0.95)' : 'scale(1.05)')}
                                                                 onMouseLeave={(e) => (e.currentTarget.style.transform = isSelected ? 'scale(0.95)' : 'scale(1)')}
-                                                                title={isBooked ? `จองโดย: ${bookingInfo?.bookerName || 'ไม่ระบุ'}` : 'ว่าง - คลิกเพื่อจอง'}
+                                                                title={isBooked ? `จองโดย: ${bookingInfo?.bookerName || 'ไม่ระบุ'}${bookingInfo?.queueCount ? ` (มีคิวรอ: ${bookingInfo.queueCount})` : ''}` : 'ว่าง - คลิกเพื่อจอง'}
                                                             >
+                                                                {bookingInfo?.queueCount ? (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        top: '-5px',
+                                                                        right: '-5px',
+                                                                        background: '#ef4444',
+                                                                        color: 'white',
+                                                                        fontSize: '0.65rem',
+                                                                        fontWeight: 'bold',
+                                                                        padding: '2px 5px',
+                                                                        borderRadius: '10px',
+                                                                        zIndex: 2,
+                                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                                    }}>
+                                                                        คิว {bookingInfo.queueCount}
+                                                                    </div>
+                                                                ) : null}
                                                                 <div style={{
                                                                     fontWeight: 'bold',
                                                                     fontSize: '0.9rem',
-                                                                    color: isBooked ? '#b45309' : isSelected ? 'var(--primary-orange)' : zone?.color
+                                                                    color: isActuallyBooked ? '#b45309' : isSelected ? 'var(--primary-orange)' : isHeld ? '#64748b' : zone?.color
                                                                 }}>
                                                                     {lock.id}
                                                                 </div>
                                                                 <div style={{
                                                                     fontSize: '0.6rem',
-                                                                    color: isBooked ? '#b45309' : isSelected ? 'var(--primary-orange)' : '#64748b',
+                                                                    color: isActuallyBooked ? '#b45309' : isSelected ? 'var(--primary-orange)' : isHeld ? '#64748b' : '#64748b',
                                                                     textAlign: 'center',
                                                                     lineHeight: 1.1
                                                                 }}>
-                                                                    {isBooked ? '🔒 ดู' : `${lock.price}฿`}
+                                                                    {isActuallyBooked ? '🔒 ดู' : isHeld ? '⏳ คิว' : `${lock.price}฿`}
                                                                 </div>
                                                             </div>
                                                         );
@@ -706,6 +736,15 @@ export default function BookingPage() {
                                             borderRadius: '4px'
                                         }} />
                                         <span>ที่เลือก</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <div style={{
+                                            width: '12px',
+                                            height: '12px',
+                                            background: '#ef4444',
+                                            borderRadius: '50%',
+                                        }} />
+                                        <span>มีคนรอคิว</span>
                                     </div>
                                 </div>
 
